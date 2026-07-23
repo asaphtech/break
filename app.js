@@ -1084,7 +1084,8 @@
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
     editingStaffId: null,
-    deletingStaffId: null
+    deletingStaffId: null,
+    focusTarget: null
   };
 
   /* ============================================
@@ -1094,6 +1095,18 @@
     render() {
       const date = State.scheduleDate;
       const activeStaff = AttendanceManager.getActiveStaffForDate(date);
+
+      // Preserve focus target before re-rendering
+      const activeEl = document.activeElement;
+      let focusTarget = State.focusTarget;
+      if (!focusTarget && activeEl && activeEl.classList && (activeEl.classList.contains('time-input') || activeEl.classList.contains('duration-select'))) {
+        focusTarget = {
+          staffId: activeEl.dataset.staffId,
+          round: activeEl.dataset.round,
+          type: activeEl.dataset.type || 'select'
+        };
+      }
+      State.focusTarget = null;
 
       // Update header
       document.getElementById('headerDate').textContent = formatDateID(date);
@@ -1117,6 +1130,23 @@
       const schedule = BreakCalculator.generateSchedule(activeStaff, date);
       wrapper.innerHTML = this._buildTable(schedule);
       footer.innerHTML = this._buildFooter(schedule);
+
+      // Restore focus after re-render!
+      if (focusTarget && focusTarget.staffId && focusTarget.round) {
+        let selector = '';
+        if (focusTarget.type === 'select') {
+          selector = `.duration-select[data-staff-id="${focusTarget.staffId}"][data-round="${focusTarget.round}"]`;
+        } else {
+          selector = `.time-input[data-staff-id="${focusTarget.staffId}"][data-round="${focusTarget.round}"][data-type="${focusTarget.type}"]`;
+        }
+        const targetEl = wrapper.querySelector(selector);
+        if (targetEl) {
+          targetEl.focus();
+          if (typeof targetEl.select === 'function') {
+            targetEl.select();
+          }
+        }
+      }
     },
 
     _buildTable(schedule) {
@@ -1502,11 +1532,19 @@
             showToast(`Break ${roundNumber} berhasil dikembalikan ke default! 🔄`, 'success');
           }
         });
-        const handleTimeInput = (input) => {
+        const handleTimeInput = (input, setSelfFocus = true) => {
           const staffId = input.dataset.staffId;
           const roundNumber = parseInt(input.dataset.round, 10);
           const type = input.dataset.type;
           const val = input.value.trim();
+
+          if (setSelfFocus && !State.focusTarget) {
+            State.focusTarget = {
+              staffId: staffId,
+              round: roundNumber.toString(),
+              type: type
+            };
+          }
 
           if (type === 'keluar') {
             BreakOverrideManager.setKeluar(State.scheduleDate, staffId, roundNumber, val);
@@ -1543,23 +1581,54 @@
           if (input) input.select();
         });
 
-        // Pressing Enter updates and blurs
+        // Smart Tab Key & Enter Navigation across table inputs
         wrapper.addEventListener('keydown', (e) => {
+          const currentInput = e.target.closest('.time-input, .duration-select');
+          if (!currentInput) return;
+
           if (e.key === 'Enter') {
-            const input = e.target.closest('.time-input');
-            if (input) {
-              e.preventDefault();
-              input.blur();
+            e.preventDefault();
+            currentInput.blur();
+            return;
+          }
+
+          if (e.key === 'Tab') {
+            const allNavigables = Array.from(wrapper.querySelectorAll('.time-input, .duration-select'));
+            const currentIndex = allNavigables.indexOf(currentInput);
+
+            if (currentIndex !== -1) {
+              const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+              if (nextIndex >= 0 && nextIndex < allNavigables.length) {
+                e.preventDefault();
+                const nextEl = allNavigables[nextIndex];
+
+                State.focusTarget = {
+                  staffId: nextEl.dataset.staffId,
+                  round: nextEl.dataset.round,
+                  type: nextEl.dataset.type || 'select'
+                };
+
+                if (currentInput.classList.contains('time-input')) {
+                  handleTimeInput(currentInput, false);
+                } else {
+                  this.refreshSchedule();
+                }
+              }
             }
           }
         });
 
-        // Instant paste handling
+        // Instant paste handling with focus preservation
         wrapper.addEventListener('paste', (e) => {
           const input = e.target.closest('.time-input');
           if (input) {
+            State.focusTarget = {
+              staffId: input.dataset.staffId,
+              round: input.dataset.round,
+              type: input.dataset.type
+            };
             setTimeout(() => {
-              handleTimeInput(input);
+              handleTimeInput(input, false);
             }, 50);
           }
         });
