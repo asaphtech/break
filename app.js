@@ -843,6 +843,32 @@
         return choices[staffId][`round_${roundNumber}`];
       }
       return defaultDuration;
+    },
+
+    resetRound(date, roundNumber) {
+      const dateStr = toDateString(date);
+      const choices = this.getChoices(date);
+      let changed = false;
+      Object.keys(choices).forEach(staffId => {
+        if (choices[staffId] && choices[staffId][`round_${roundNumber}`]) {
+          delete choices[staffId][`round_${roundNumber}`];
+          changed = true;
+        }
+      });
+      if (changed) {
+        Storage.set(`break_choice_${dateStr}`, choices);
+        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+          CloudSync.pushData();
+        }
+      }
+    },
+
+    resetAll(date) {
+      const dateStr = toDateString(date);
+      Storage.remove(`break_choice_${dateStr}`);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
     }
   };
 
@@ -897,6 +923,32 @@
         return overrides[staffId][`round_${roundNumber}`];
       }
       return {};
+    },
+
+    resetRound(date, roundNumber) {
+      const dateStr = toDateString(date);
+      const overrides = this.getOverrides(date);
+      let changed = false;
+      Object.keys(overrides).forEach(staffId => {
+        if (overrides[staffId] && overrides[staffId][`round_${roundNumber}`]) {
+          delete overrides[staffId][`round_${roundNumber}`];
+          changed = true;
+        }
+      });
+      if (changed) {
+        Storage.set(`break_override_${dateStr}`, overrides);
+        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+          CloudSync.pushData();
+        }
+      }
+    },
+
+    resetAll(date) {
+      const dateStr = toDateString(date);
+      Storage.remove(`break_override_${dateStr}`);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
     }
   };
 
@@ -1081,8 +1133,13 @@
       schedule.breaks.forEach(br => {
         // Break group header
         html += `<tr class="break-header-row"><td colspan="${N + 1}" class="break-header-cell">`;
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;">`;
+        html += `<div>`;
         html += `<span class="break-label">Break ${br.roundNumber}</span>`;
         html += `<span class="break-duration-badge">Default: ${formatDuration(br.defaultDuration)}</span>`;
+        html += `</div>`;
+        html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset Break ${br.roundNumber}</button>`;
+        html += `</div>`;
         html += '</td></tr>';
 
         // MATIKAN LC row
@@ -1421,8 +1478,30 @@
         window.print();
       });
 
+      const resetAllBtn = document.getElementById('resetAllBtn');
+      if (resetAllBtn) {
+        resetAllBtn.addEventListener('click', () => {
+          if (confirm('Apakah Anda yakin ingin mengembalikan seluruh jadwal hari ini ke default?')) {
+            BreakOverrideManager.resetAll(State.scheduleDate);
+            BreakChoiceManager.resetAll(State.scheduleDate);
+            this.refreshSchedule();
+            showToast('Seluruh jadwal break berhasil dikembalikan ke default! 🔄', 'success');
+          }
+        });
+      }
+
       const wrapper = document.getElementById('scheduleTableWrapper');
       if (wrapper) {
+        wrapper.addEventListener('click', (e) => {
+          const resetBtn = e.target.closest('.btn-reset-round');
+          if (resetBtn) {
+            const roundNumber = parseInt(resetBtn.dataset.round, 10);
+            BreakOverrideManager.resetRound(State.scheduleDate, roundNumber);
+            BreakChoiceManager.resetRound(State.scheduleDate, roundNumber);
+            this.refreshSchedule();
+            showToast(`Break ${roundNumber} berhasil dikembalikan ke default! 🔄`, 'success');
+          }
+        });
         const handleTimeInput = (input) => {
           const staffId = input.dataset.staffId;
           const roundNumber = parseInt(input.dataset.round, 10);

@@ -888,6 +888,29 @@ body::before {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.5) !important;
 }
 
+/* Reset per-break button */
+.btn-reset-round {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-reset-round:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+  border-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
 
 
 /* MASUK rows - Green */
