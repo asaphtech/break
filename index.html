@@ -63,9 +63,14 @@
             <button class="btn-icon" id="nextDay" title="Hari berikutnya">▶</button>
             <button class="btn-sm" id="todayBtn">Hari Ini</button>
           </div>
-          <button class="btn-primary" id="printBtn">
-            <span>🖨️</span> Cetak Jadwal
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-primary" id="syncLatotoBtn" title="Sync Log Jam Izin Latoto">
+              <span>🔄</span> Sync Log Latoto
+            </button>
+            <button class="btn-secondary" id="printBtn">
+              <span>🖨️</span> Cetak Jadwal
+            </button>
+          </div>
         </div>
 
         <div class="schedule-notes top-notes">
@@ -269,6 +274,44 @@
       <div class="modal-footer">
         <button class="btn-secondary" id="cancelSupabase" type="button">Batal</button>
         <button class="btn-primary" id="saveSupabase" type="button">Hubungkan & Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Latoto Sync Modal ========== -->
+  <div class="modal-overlay" id="latotoModal">
+    <div class="modal" style="max-width:550px;">
+      <div class="modal-header">
+        <h3>🔄 Sync Log Jam Izin Latoto</h3>
+        <button class="modal-close" id="closeLatotoModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px;color:var(--text-secondary);font-size:0.85rem;">
+          Tarik data jam keluar & jam masuk dari sistem Latoto secara otomatis atau via copy-paste.
+        </p>
+
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button class="btn-sm btn-primary" id="btnLatotoAuto" type="button">⚡ Sync Otomatis Server</button>
+          <button class="btn-sm btn-secondary" id="btnLatotoPaste" type="button">📋 Paste Teks Log</button>
+        </div>
+
+        <div id="latotoAutoSection">
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;line-height:1.4;">
+            Sistem akan masuk sebagai <strong>rikky</strong> ke <code>latoto.marsipature.com</code> dan mengambil log jam keluar/masuk CS hari ini.
+          </div>
+          <button class="btn-primary" id="startLatotoFetchBtn" type="button" style="width:100%;">🚀 Mulai Sync Otomatis Latoto</button>
+        </div>
+
+        <div id="latotoPasteSection" style="display:none;">
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:6px;">Paste Teks / HTML Log Latoto Di Sini:</label>
+          <textarea id="latotoPasteInput" class="form-input" rows="6" placeholder="Copy seluruh tabel/teks dari latoto.marsipature.com lalu paste di sini..."></textarea>
+          <button class="btn-primary" id="startLatotoParseBtn" type="button" style="width:100%;margin-top:10px;">📥 Impor Data Paste</button>
+        </div>
+
+        <div id="latotoStatusMsg" style="display:none;font-size:0.85rem;margin-top:12px;font-weight:600;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancelLatoto" type="button">Tutup</button>
       </div>
     </div>
   </div>

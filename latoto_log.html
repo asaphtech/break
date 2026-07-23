@@ -1,0 +1,1174 @@
+
+<!-- HUTRI81:PHP:START -->
+<!-- HUTRI81:PHP:END -->
+
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Portal_SMB</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/dashboard.css?v=1779885258">
+    <link rel="stylesheet" href="dark-mode/dashboard_dark_mode.css?v=1779887838">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="icon" type="image/png" href="/assets/favicon/latoto.png?v=1">
+
+<!-- HUTRI81:ASSETS:START -->
+    <link
+        rel="stylesheet"
+        href="assets/themes/hutri81/hutri81.css?v=1784289262"
+    >
+
+    <script>
+        window.DRAGON_HUTRI81 = {"showBanner":true,"showBadge":true,"showConfetti":true,"confettiOnce":true};
+    </script>
+
+    <script
+        defer
+        src="assets/themes/hutri81/hutri81.js?v=1784289262"
+    ></script>
+<!-- HUTRI81:ASSETS:END -->
+
+</head>
+
+<body>
+
+    <header class="header-busy">
+        <div class="logo-container">
+            <img src="/assets/logos/latoto.png" style="height:60px;">
+            <h1></h1>
+        </div>
+
+        <div class="header-right">
+            <div class="digital-clock">
+                <i class="fas fa-clock"></i>
+                <span id="clock">--:--:--</span> | <span id="tanggal">-- -- ----</span>
+            </div>
+            <script>
+                function updateClockAndDate() {
+                    const now = new Date();
+
+                    const jam = String(now.getHours()).padStart(2, '0');
+                    const menit = String(now.getMinutes()).padStart(2, '0');
+                    const detik = String(now.getSeconds()).padStart(2, '0');
+                    document.getElementById('clock').textContent = `${jam}:${menit}:${detik}`;
+
+                    const hari = String(now.getDate()).padStart(2, '0');
+                    const bulanIndo = [
+                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                    ];
+                    const bulan = bulanIndo[now.getMonth()];
+                    const tahun = now.getFullYear();
+
+                    document.getElementById('tanggal').textContent = `${hari} ${bulan} ${tahun}`;
+                }
+
+                setInterval(updateClockAndDate, 1000);
+                updateClockAndDate();
+            </script>
+
+            <button id="darkModeToggle" class="dark-mode-toggle">
+                <i class="fas fa-moon"></i>
+            </button>
+
+            <div class="profile-menu">
+                <button onclick="toggleProfileMenu()" class="profile-button">
+                                            <div class="profile-initial">
+                            R                        </div>
+                    
+                    <strong>RIKKY CANDRA</strong>
+                    <span class="role-tag">CS</span>
+                </button>
+                <div class="dropdown-content" id="profileDropdown">
+                    <a href="header_dashboard_profile/ganti_profile.php"><i class="fas fa-user"></i> Ganti Profile</a>
+                    <a href="header_dashboard_profile/ganti_password.php"><i class="fas fa-key"></i> Ganti Password</a>
+                    <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    
+                    <script>
+                        document.getElementById("editMarqueeBtn")?.addEventListener("click", async function() {
+                            const {
+                                value: teksBaru
+                            } = await Swal.fire({
+                                title: "Edit Teks Marquee",
+                                input: "text",
+                                inputLabel: "Masukkan teks baru untuk marquee:",
+                                inputPlaceholder: "🌟 Selamat datang di Management Dashboard! 🌟",
+                                inputValue: "The strongest people are not those who never fail, but those who rise every time they fall 👊",
+                                showCancelButton: true,
+                                confirmButtonText: "Simpan",
+                                cancelButtonText: "Batal",
+                                confirmButtonColor: "#00aaff",
+                                background: "#1e1e1e",
+                                color: "#fff"
+                            });
+
+                            if (teksBaru) {
+                                const formData = new FormData();
+                                formData.append('save_marquee', '1');
+                                formData.append('marquee_text', teksBaru);
+
+                                const response = await fetch("", {
+                                    method: "POST",
+                                    body: formData
+                                });
+
+                                if (response.ok) {
+                                    Swal.fire({
+                                        icon: "success",
+                                        title: "Berhasil!",
+                                        text: "Teks marquee berhasil diperbarui.",
+                                        confirmButtonColor: "#00aaff"
+                                    }).then(() => location.reload());
+                                } else {
+                                    Swal.fire({
+                                        icon: "error",
+                                        title: "Gagal!",
+                                        text: "Terjadi kesalahan saat menyimpan teks marquee.",
+                                        confirmButtonColor: "#d33"
+                                    });
+                                }
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <div class="marquee-container">
+        <div class="marquee">
+            The strongest people are not those who never fail, but those who rise every time they fall 👊        </div>
+    </div>
+
+    <style>
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            background: linear-gradient(90deg, #0f1115, #1c1c1c);
+            padding: 20px 0 12px 0;
+            border-bottom: 2px solid #ffffff33;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .marquee {
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            letter-spacing: 1px;
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5), 0 0 10px rgba(255, 255, 255, 0.3);
+            padding-left: 100%;
+            animation: marqueeAnimation 20s linear infinite;
+            transform: translateY(4px);
+        }
+
+        .marquee-container:hover .marquee {
+            animation-play-state: paused;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.6);
+        }
+
+        @keyframes marqueeAnimation {
+            0% { transform: translateX(0) translateY(4px); }
+            100% { transform: translateX(-100%) translateY(4px); }
+        }
+
+        /* ====== Extension Install Card (Dashboard) ====== */
+        .ext-install-wrap{ margin: 12px 0 6px; }
+        .ext-install-card{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap: 14px;
+          padding: 14px 16px;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid rgba(15,23,42,.08);
+          box-shadow: 0 10px 26px rgba(2,6,23,.06);
+        }
+        .ext-install-left{ display:flex; align-items:center; gap: 12px; min-width: 0; }
+        .ext-install-ico{
+          width: 44px; height: 44px;
+          border-radius: 14px;
+          display:grid; place-items:center;
+          background: linear-gradient(135deg, rgba(59,130,246,.14), rgba(34,197,94,.10));
+          border: 1px solid rgba(15,23,42,.10);
+          flex: 0 0 auto;
+        }
+        .ext-install-ico i{ font-size: 18px; color: #0f172a; }
+        .ext-install-title{ font-weight: 900; font-size: 14px; color: #0f172a; }
+        .ext-install-sub{
+          font-size: 12px;
+          color: rgba(15,23,42,.75);
+          line-height: 1.35;
+          margin-top: 2px;
+        }
+        .ext-install-actions{ display:flex; gap: 10px; flex-wrap: wrap; justify-content:flex-end; }
+        .btn-ext-download, .btn-ext-how{
+          border-radius: 14px;
+          padding: 10px 12px;
+          font-weight: 900;
+          font-size: 12px;
+          border: 1px solid rgba(15,23,42,.10);
+          text-decoration:none;
+          cursor:pointer;
+          display:inline-flex;
+          align-items:center;
+          gap: 8px;
+        }
+        .btn-ext-download{
+          background: linear-gradient(135deg, #22c55e, #16a34a);
+          color: #062312;
+          border: none;
+          box-shadow: 0 10px 22px rgba(34,197,94,.18);
+        }
+        .btn-ext-download:hover{ filter: brightness(1.03); }
+        .btn-ext-how{
+          background: rgba(2,6,23,.04);
+          color: #0f172a;
+        }
+        .btn-ext-how:hover{ background: rgba(2,6,23,.06); }
+
+        .ext-install-steps{
+          margin-top: 10px;
+          padding: 14px 16px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.85);
+          border: 1px solid rgba(15,23,42,.08);
+          box-shadow: 0 10px 26px rgba(2,6,23,.05);
+        }
+        .ext-install-steps ol{ margin: 0 0 10px 18px; padding: 0; color: rgba(15,23,42,.85); font-size: 12px; }
+        .ext-install-steps li{ margin: 6px 0; }
+        .ext-install-note{
+          display:flex; align-items:flex-start; gap: 8px;
+          font-size: 12px;
+          color: rgba(15,23,42,.80);
+          background: rgba(59,130,246,.08);
+          border: 1px solid rgba(59,130,246,.16);
+          padding: 10px 12px;
+          border-radius: 14px;
+        }
+        .ext-install-note code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-weight: 800; }
+    </style>
+
+        <nav class="nav-menu" id="sidebar">
+
+                    <button id="menuToggle" class="menu-toggle"><i class="fas fa-bars"></i></button>
+        
+        <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></a>
+
+        <div class="custom-dropdown open">
+            <a href="#" class="custom-dropbtn" onclick="toggleDropdown(this)">
+                <i class="fas fa-business-time"></i> <span>Jam Izin</span>
+                <i class="fas fa-caret-down dropdown-icon"></i>
+            </a>
+            <div class="custom-dropdown-content show">
+                                    <a href="dashboard.php?page=track" class=""><i class="fas fa-stopwatch"></i> Clock In/Out</a>
+                    <a href="dashboard.php?page=tabelizin" class="active"><i class="fas fa-user-check"></i> Dashboard Izin</a>
+                                            </div>
+        </div>
+
+                    <div class="custom-dropdown ">
+                <a href="#" class="custom-dropbtn" onclick="toggleDropdown(this)">
+                    <i class="fas fa-file-signature"></i> <span>Pengajuan</span>
+                    <i class="fas fa-caret-down dropdown-icon"></i>
+                </a>
+                <div class="custom-dropdown-content ">
+                                            <a href="dashboard.php?page=pengajuan_cuti" class=""><i class="fas fa-umbrella-beach"></i> Pengajuan Cuti</a>
+                                                                                    <a href="dashboard.php?page=pengajuan_resign" class=""><i class="fas fa-door-open"></i> Pengajuan Resign</a>
+                                                                <a href="dashboard.php?page=pengajuan_rekening_gaji" class=""><i class="fas fa-wallet"></i> Ganti Rek Gaji</a>
+                                    </div>
+            </div>
+        
+        
+        
+                    <div class="custom-dropdown ">
+                <a href="#" class="custom-dropbtn" onclick="toggleDropdown(this)">
+                    <i class="fas fa-calendar-alt"></i> <span>Shift Kerja</span> <i class="fas fa-caret-down dropdown-icon"></i>
+                </a>
+                <div class="custom-dropdown-content ">
+                                            <a href="dashboard.php?page=shift_kerja_cs" class=""><i class="fas fa-user-clock"></i> Shift Kerja CS</a>
+                                                                <a href="dashboard.php?page=shift_kerja_kksks" class=""><i class="fas fa-users-cog"></i> Shift Kerja KKS / KS</a>
+                    
+                                            <a href="dashboard.php?page=offday_pengajuan" class=""><i class="fas fa-calendar-check"></i> Pengajuan Off Day</a>
+                                                                <a href="dashboard.php?page=offday_rekap" class=""><i class="fas fa-chart-line"></i> Rekapan Off Day</a>
+                                                                            </div>
+            </div>
+        
+                    <div class="custom-dropdown ">
+                <a href="#" class="custom-dropbtn" onclick="toggleDropdown(this)">
+                    <i class="fa-solid fa-server"></i> <span>Domain</span> <i class="fas fa-caret-down dropdown-icon"></i>
+                </a>
+                <div class="custom-dropdown-content ">
+                                            <a href="dashboard.php?page=cek_domain" class=""><i class="fa-solid fa-list"></i> All Domain</a>
+                                                                <a href="dashboard.php?page=pengecekkan" class=""><i class="fa-solid fa-list"></i> Checking Error URL</a>
+                                    </div>
+            </div>
+        
+        
+                    <div class="custom-dropdown ">
+                <a href="#" class="custom-dropbtn" onclick="toggleDropdown(this)">
+                    <i class="fa-solid fa-circle-check"></i> <span>Checker</span> <i class="fas fa-caret-down dropdown-icon"></i>
+                </a>
+                <div class="custom-dropdown-content ">
+                                        <a href="dashboard.php?page=bola" class="">
+                        <i class="fa-solid fa-futbol"></i> Bola
+                    </a>
+                                                            <a href="dashboard.php?page=password_generator" class="">
+                        <i class="fa-solid fa-key"></i> Password Generator
+                    </a>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                                    </div>
+            </div>
+        
+                <a href="dashboard.php?page=chat"
+        class="">
+                <i class="fas fa-comment-dots"></i>
+                <span>Chat</span>
+            </a>
+        
+        
+        
+        
+        
+        
+        
+
+
+
+        
+        
+    </nav>
+
+    <script>
+        const blockedDomains = [];
+
+        if (blockedDomains.length > 0) {
+            const notif = document.getElementById('blockedNotification');
+            const listEl = document.getElementById('blockedDomainsList');
+
+            if (notif && listEl) {
+                blockedDomains.forEach(domain => {
+                    const li = document.createElement('li');
+                    li.textContent = domain;
+                    listEl.appendChild(li);
+                });
+
+                notif.style.display = 'block';
+            }
+            if (typeof Swal !== 'undefined') {
+Swal.fire({
+                    icon: 'error',
+                    title: '🚨 DOMAIN TERBLOCK',
+                    html: `
+                        <div style="text-align:left;font-size:14px;line-height:1.7">
+                            <b>${blockedDomains.length}</b> domain terdeteksi <b style="color:#dc2626">BLOCKED</b>:<br><br>
+                            <div style="max-height:220px;overflow:auto;padding:10px;border-radius:10px;background:#111827;color:#fff">
+                                ${blockedDomains.map(d => '• ' + d).join('<br>')}
+                            </div>
+                            <br>
+                            Silakan cek menu <b>Domain</b>.
+                        </div>
+                    `,
+                    confirmButtonText: 'Buka Menu Domain',
+                    showCancelButton: true,
+                    cancelButtonText: 'Tutup',
+                    confirmButtonColor: '#dc2626'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = 'dashboard.php?page=cek_domain';
+                    }
+                });
+            }
+        }
+    </script>
+
+    <main>
+        
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Izin 15 Menit - Dashboard Jam Izin Staff</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Prevent Indexing -->
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="description" content="Dashboard internal untuk memantau jam izin staff. Hanya untuk penggunaan internal yang berwenang.">
+    <meta name="referrer" content="no-referrer">
+    <meta name="application-name" content="Portal SMB Staff Dashboard">
+
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" href="/assets/favicon/favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+
+<link rel="stylesheet" href="menu-jam-izin/tabelizin.css?v=1779887916">
+<link rel="stylesheet" href="menu-jam-izin/tabelizin_darkmode.css?v=1779887916">
+<link rel="stylesheet" href="assets/style.css?v=1780233797">
+</head>
+<body class="dashboardtracker-page" id="bodyTrack">
+    <div class="DashboardTracker-page">
+
+  <div class="userlist-header">
+      <h2><i class="fas fa-briefcase"></i> Dashboard Jobdesk</h2>
+  </div>
+  <h2><i class="fas fa-clock"></i> Izin 15 Menit - Dashboard Jam Izin</h2>
+
+  <div class="filter-box">
+    <form method="GET" action="dashboard.php">
+      <input type="hidden" name="page" value="tabelizin">
+      <input type="hidden" name="view" value="normal">
+
+      <input type="date" name="tanggal" value="2026-07-23">
+      <input type="text" name="nama" placeholder="Cari nama..." value="">
+
+      <select name="role">
+        <option value="">Semua Role</option>
+        <option value='CS' selected>CS</option><option value='CS LINE' >CS LINE</option><option value='KKS' >KKS</option><option value='KS' >KS</option><option value='Leader' >Leader</option>      </select>
+
+      <select name="source">
+        <option value="logs" selected>Izin 15 Menit</option>
+        <option value="logs_izin_makan" >Izin Ambil Makan</option>
+      </select>
+
+      <button type="submit"><i class="fas fa-search"></i> Tampilkan</button>
+      <button type="submit" name="view" value="lewat"><i class="fas fa-clock"></i> Lewat</button>
+      <button type="submit" name="view" value="statistik"><i class="fas fa-chart-bar"></i> Statistik</button>
+    </form>
+  </div>
+
+  
+  <div class="table-wrapper">
+  <table>
+    <thead>
+<tr>
+  <th class="nama-cell"><i class="fas fa-user-circle"></i> Nama</th>
+  <th><i class="fas fa-user-tag"></i> Role</th>
+  <th><i class="fas fa-briefcase"></i> Jobdesk</th>
+  <th><i class="fas fa-sign-in-alt"></i> Clock In</th>
+  <th><i class="fas fa-sign-out-alt"></i> Clock Out</th>
+  <th><i class="fas fa-hourglass-half"></i> Durasi</th>
+  <th><i class="fas fa-stopwatch"></i> Status</th>
+  </tr>
+    </thead>
+    <tbody>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">J</div>
+                            <span>JULIUS NABABAN</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>14:14:48 WIB</td>
+          <td>14:30:46 WIB</td>
+          <td>0 Jam 15 Menit 58 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">W</div>
+                            <span>WILLY ARDI JAYA</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>13:55:51 WIB</td>
+          <td>14:12:39 WIB</td>
+          <td>0 Jam 16 Menit 48 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">L</div>
+                            <span>LIDIA ANDRIANI</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>13:35:05 WIB</td>
+          <td>13:53:19 WIB</td>
+          <td>0 Jam 18 Menit 14 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">S</div>
+                            <span>STEVAN</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>13:14:26 WIB</td>
+          <td>13:32:21 WIB</td>
+          <td>0 Jam 17 Menit 55 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">D</div>
+                            <span>DONI SAHAT P SIHITE</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>12:55:50 WIB</td>
+          <td>13:11:27 WIB</td>
+          <td>0 Jam 15 Menit 37 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">Y</div>
+                            <span>YOSUA HAMASEA SIRAIT</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>12:37:55 WIB</td>
+          <td>12:53:50 WIB</td>
+          <td>0 Jam 15 Menit 55 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">C</div>
+                            <span>CALVIN SUNDORO</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>12:20:29 WIB</td>
+          <td>12:38:41 WIB</td>
+          <td>0 Jam 18 Menit 12 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">R</div>
+                            <span>RIKKY CANDRA</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>12:00:01 WIB</td>
+          <td>12:21:26 WIB</td>
+          <td>0 Jam 21 Menit 25 Detik</td>
+          <td>
+                          <span class="badge bad">Lewat</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">A</div>
+                            <span>ANDANI PARAPAT</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>11:39:35 WIB</td>
+          <td>11:57:56 WIB</td>
+          <td>0 Jam 18 Menit 21 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">J</div>
+                            <span>JULIUS NABABAN</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>11:15:41 WIB</td>
+          <td>11:35:21 WIB</td>
+          <td>0 Jam 19 Menit 40 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">W</div>
+                            <span>WILLY ARDI JAYA</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>10:53:15 WIB</td>
+          <td>11:12:21 WIB</td>
+          <td>0 Jam 19 Menit 6 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">L</div>
+                            <span>LIDIA ANDRIANI</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>10:33:44 WIB</td>
+          <td>10:53:30 WIB</td>
+          <td>0 Jam 19 Menit 46 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">S</div>
+                            <span>STEVAN</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>10:10:43 WIB</td>
+          <td>10:30:07 WIB</td>
+          <td>0 Jam 19 Menit 24 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">D</div>
+                            <span>DONI SAHAT P SIHITE</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>09:51:08 WIB</td>
+          <td>10:10:30 WIB</td>
+          <td>0 Jam 19 Menit 22 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">Y</div>
+                            <span>YOSUA HAMASEA SIRAIT</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>09:36:36 WIB</td>
+          <td>09:50:40 WIB</td>
+          <td>0 Jam 14 Menit 4 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">C</div>
+                            <span>CALVIN SUNDORO</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>09:13:03 WIB</td>
+          <td>09:32:45 WIB</td>
+          <td>0 Jam 19 Menit 42 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">R</div>
+                            <span>RIKKY CANDRA</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>08:52:38 WIB</td>
+          <td>09:12:00 WIB</td>
+          <td>0 Jam 19 Menit 22 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">A</div>
+                            <span>ANDANI PARAPAT</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>08:32:02 WIB</td>
+          <td>08:52:16 WIB</td>
+          <td>0 Jam 20 Menit 14 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">H</div>
+                            <span>HENDRY</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>06:37:09 WIB</td>
+          <td>06:56:22 WIB</td>
+          <td>0 Jam 19 Menit 13 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+              <tr>
+          <td class="nama-cell">
+            <div class="user-avatar">
+                              <div class="avatar-initial">M</div>
+                            <span>MALVIN OCTAVIO</span>
+            </div>
+          </td>
+          <td>CS</td>
+          <td>CS</td>
+          <td>06:33:46 WIB</td>
+          <td>06:50:26 WIB</td>
+          <td>0 Jam 16 Menit 40 Detik</td>
+          <td>
+                          <span class="badge good">Tepat Waktu</span>
+                      </td>
+
+                  </tr>
+          </tbody>
+  </table>
+</div>
+
+   <!-- ✅ TUTUP if ($viewMode === 'statistik') -->
+  
+<div class="pagination">
+  
+      <a href="dashboard.php?page=tabelizin&view=normal&tanggal=2026-07-23&nama=&role=CS&source=logs&hal=1" 
+       class="page-btn active">
+       1    </a>
+      <a href="dashboard.php?page=tabelizin&view=normal&tanggal=2026-07-23&nama=&role=CS&source=logs&hal=2" 
+       class="page-btn ">
+       2    </a>
+      <a href="dashboard.php?page=tabelizin&view=normal&tanggal=2026-07-23&nama=&role=CS&source=logs&hal=3" 
+       class="page-btn ">
+       3    </a>
+  
+      <a href="dashboard.php?page=tabelizin&view=normal&tanggal=2026-07-23&nama=&role=CS&source=logs&hal=2" class="page-btn">Next »</a>
+  </div>
+
+</div>
+</body>
+</html>
+    
+</main>
+
+    <script src="assets/js/dashboard.js?v=1779885261"></script>
+    
+    <script>
+        function toggleDropdown(button) {
+            const dropdown = button.parentElement;
+            dropdown.classList.toggle('open');
+
+            const content = dropdown.querySelector('.custom-dropdown-content');
+            if (!content) return;
+
+            if (dropdown.classList.contains('open')) {
+                content.style.display = 'flex';
+                content.style.maxHeight = content.scrollHeight + 'px';
+            } else {
+                content.style.maxHeight = '0';
+                setTimeout(() => {
+                    content.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        window.addEventListener('click', function(e) {
+            const dropdowns = document.querySelectorAll('.custom-dropdown');
+            dropdowns.forEach(dd => {
+                if (!dd.contains(e.target)) {
+                    dd.classList.remove('open');
+                    const content = dd.querySelector('.custom-dropdown-content');
+                    if (!content) return;
+                    content.style.maxHeight = '0';
+                    setTimeout(() => {
+                        content.style.display = 'none';
+                    }, 300);
+                }
+            });
+        });
+    </script>
+
+    <script>
+        const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                const dropdownMenu = this.nextElementSibling;
+
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    if (menu !== dropdownMenu) {
+                        menu.style.display = 'none';
+                    }
+                });
+
+                if (dropdownMenu && dropdownMenu.style.display === 'block') {
+                    dropdownMenu.style.display = 'none';
+                } else if (dropdownMenu) {
+                    dropdownMenu.style.display = 'block';
+                }
+            });
+        });
+
+        const dropdownItems = document.querySelectorAll('.dropdown-menu a');
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const btn = document.getElementById("menuToggle");
+            const sidebar = document.getElementById("sidebar");
+            if (btn && sidebar) {
+                btn.addEventListener("click", () => sidebar.classList.toggle("collapsed"));
+            }
+        });
+    </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async function () {
+  const blockedDomains = [];
+
+  // Jangan tampilkan kalau lagi di page cek_domain
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentPage = urlParams.get("page");
+  if (currentPage === "cek_domain") return;
+
+  const targetUrl = "dashboard.php?page=cek_domain";
+
+  // Wajib: Notification API tersedia
+  if (!("Notification" in window)) return;
+
+  // Minta izin 1x saja (biar gak spam popup permission)
+  const askedKey = "notifPermissionAsked_blockedDomain";
+  if (Notification.permission === "default" && !localStorage.getItem(askedKey)) {
+    localStorage.setItem(askedKey, "1");
+    try { await Notification.requestPermission(); } catch(e) {}
+  }
+
+  // Kalau masih belum granted, stop
+  if (Notification.permission !== "granted") return;
+
+  // Kalau tidak ada domain, stop
+  if (!Array.isArray(blockedDomains) || blockedDomains.length === 0) return;
+
+  const iconUrl = "/assets/favicon/latoto.png?v=1";
+
+  // Biar notif gak numpuk: simpan instance terakhir
+  let lastNotif = null;
+
+  const buildBody = (arr) => {
+    const max = 5;
+    const slice = arr.slice(0, max);
+    return slice.join("\n") + (arr.length > max ? `\n+${arr.length - max} lainnya...` : "");
+  };
+
+  const showChromeNotif = () => {
+    try {
+      // Tutup notif sebelumnya biar tidak stack
+      if (lastNotif) { try { lastNotif.close(); } catch(e) {} }
+
+      const title = `Notifikasi! (${blockedDomains.length}) domain terblokir`;
+      const body  = buildBody(blockedDomains);
+
+      lastNotif = new Notification(title, {
+        body,
+        icon: iconUrl,
+        silent: false,
+
+        // penting: tag bikin notif "replace" bukan numpuk (Chrome)
+        tag: "blocked-domain-notif",
+        renotify: true
+      });
+
+      lastNotif.onclick = () => {
+        try { window.focus(); } catch(e) {}
+        window.location.href = targetUrl;
+        try { lastNotif.close(); } catch(e) {}
+      };
+
+      // Auto close sebelum 3 detik biar pas muncul lagi
+      setTimeout(() => {
+        try { lastNotif && lastNotif.close(); } catch(e) {}
+      }, 2500);
+
+    } catch(e) {}
+  };
+
+  // Langsung tembak pertama kali
+  showChromeNotif();
+
+  // Muncul tiap 3 detik
+  setInterval(() => {
+    // Kalau masih ada domain terblokir, terus munculin
+    if (Array.isArray(blockedDomains) && blockedDomains.length > 0) {
+      showChromeNotif();
+    }
+  }, 3000);
+});
+</script>
+
+
+
+
+
+
+
+
+
+
+<script>
+(function(){
+    async function bindDragonMonitorDevice(){
+        try {
+            const r = await fetch('http://127.0.0.1:39877/device', {
+                method: 'GET',
+                cache: 'no-store'
+            });
+
+            if (!r.ok) return;
+
+            const d = await r.json();
+            if (!d || !d.success || !d.deviceKey) return;
+
+            const body = new URLSearchParams();
+            body.append('device_key', d.deviceKey);
+            body.append('pc_name', d.pcName || d.deviceKey);
+
+            await fetch('menu-monitor/api_set_active_device.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body
+            });
+
+            console.log('[DragonMonitor] active device bound:', d.deviceKey);
+        } catch(e) {
+            // Agent belum jalan di PC ini, abaikan.
+        }
+    }
+
+    bindDragonMonitorDevice();
+    setInterval(bindDragonMonitorDevice, 60000);
+})();
+</script>
+</body>
+</html>
+
+<style>
+    .footer {
+        color: #969696ff;
+        text-align: center;
+        padding: 15px 20px;
+        position: relative;
+        bottom: 0;
+        width: 100%;
+        font-size: 14px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .footer-content p {
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .footer strong {
+        color: #e78b00ff;
+    }
+
+    .nav-menu a {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .swal2-close {
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const notifBtn = document.querySelector(".notif-btn");
+        const notifDropdown = document.getElementById("notifDropdown");
+        const closeNotif = document.getElementById("closeNotif");
+
+        if (notifBtn && notifDropdown) {
+            notifBtn.addEventListener("click", function(e) {
+                e.stopPropagation();
+                notifDropdown.classList.toggle("active");
+            });
+        }
+
+        if (closeNotif && notifDropdown) {
+            closeNotif.addEventListener("click", function() {
+                notifDropdown.classList.remove("active");
+            });
+        }
+
+        document.addEventListener("click", function(e) {
+            if (notifDropdown && notifBtn) {
+                if (!notifDropdown.contains(e.target) && !notifBtn.contains(e.target)) {
+                    notifDropdown.classList.remove("active");
+                }
+            }
+        });
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const blockedDomains = [];
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = urlParams.get("page");
+
+        if (currentPage === "cek_domain") return;
+
+        if (blockedDomains.length > 0) {
+            Swal.fire({
+                title: '<i class="fas fa-bell"></i> Notifikasi!',
+                html: `
+                <p style="font-size:16px; margin-bottom:10px;">
+                    Ada <strong>${blockedDomains.length}</strong> domain terblokir 🚫
+                </p>
+                <ul style="text-align:left; max-height:150px; overflow-y:auto; padding-left:20px;">
+                    ${blockedDomains.map(d => `<li><i class="fas fa-globe"></i> ${d}</li>`).join('')}
+                </ul>
+                <a href="dashboard.php?page=cek_domain" 
+                   style="display:inline-block; margin-top:12px; padding:8px 15px; background:#3085d6; color:#fff; border-radius:6px; text-decoration:none;">
+                   <i class="fas fa-eye"></i> Lihat Selengkapnya
+                </a>
+            `,
+                icon: 'warning',
+                showConfirmButton: false,
+                showCloseButton: true,
+                background: '#1e1e2f',
+                color: '#fff',
+                customClass: {
+                    popup: 'animated fadeInDown',
+                    title: 'swal-title',
+                    htmlContainer: 'swal-text'
+                }
+            });
+        }
+    });
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const params = new URLSearchParams(window.location.search);
+  const page = params.get("page");
+
+  if (page === "chat") {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.add("collapsed");
+  }
+});
+</script>
+
+<script>
+window.agwlExtHow = function(){
+  var el = document.getElementById('agwl-ext-steps');
+  if (!el) return;
+  var show = (el.style.display === 'none' || el.style.display === '');
+  el.style.display = show ? 'block' : 'none';
+  if (show) {
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e){}
+  }
+};
+</script>
