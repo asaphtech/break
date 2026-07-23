@@ -888,14 +888,7 @@ body::before {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.5) !important;
 }
 
-/* Tolerance & Late indicators */
-.time-input.is-tolerance {
-  border-color: #f59e0b !important;
-  color: #fef08a !important;
-  background: rgba(245, 158, 11, 0.25) !important;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4) !important;
-}
-
+/* Late indicators */
 .time-input.is-late {
   border-color: #ef4444 !important;
   color: #fca5a5 !important;
@@ -911,12 +904,6 @@ body::before {
   padding: 2px 5px;
   display: inline-block;
   white-space: nowrap;
-}
-
-.tolerance-tag.safe-tag {
-  background: rgba(245, 158, 11, 0.25);
-  color: #fef08a;
-  border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
 .tolerance-tag.late-tag {

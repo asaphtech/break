@@ -1136,7 +1136,6 @@
         br.slots.forEach(slot => {
           let inputClass = 'time-input masuk-input';
           if (slot.isLate) inputClass += ' is-late';
-          else if (slot.isWithinTolerance) inputClass += ' is-tolerance';
           else if (slot.isMasukOverride) inputClass += ' is-override';
 
           html += '<td class="time-cell masuk-cell">';
@@ -1146,8 +1145,6 @@
 
           if (slot.isLate) {
             html += `<div class="tolerance-tag late-tag" title="Durasi ${formatDuration(slot.actualDuration)} melebihi batas toleransi 21:00m">⚠️ Telat (${formatDuration(slot.actualDuration)})</div>`;
-          } else if (slot.isWithinTolerance) {
-            html += `<div class="tolerance-tag safe-tag" title="Durasi ${formatDuration(slot.actualDuration)} (Toleransi +1m)">🛡️ Toleransi (${formatDuration(slot.actualDuration)})</div>`;
           }
 
           html += '</td>';
