@@ -1553,7 +1553,6 @@
           }
 
           this.refreshSchedule();
-          showToast(`Jam ${type} berhasil disesuaikan! ⏰`, 'success');
         };
 
         wrapper.addEventListener('change', (e) => {
@@ -1565,7 +1564,6 @@
 
             BreakChoiceManager.setChoice(State.scheduleDate, staffId, roundNumber, durationSeconds);
             this.refreshSchedule();
-            showToast('Pilihan durasi break berhasil diperbarui! ⏱️', 'success');
             return;
           }
 
