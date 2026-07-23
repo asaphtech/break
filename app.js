@@ -7,6 +7,7 @@
   const TOTAL_SECONDS = 37620;        // 08:33:00 → 19:00:00
   const START_SECONDS = 30780;        // 08:33:00 as seconds from midnight
   const MAX_BREAK_DURATION = 1200;    // 20 minutes in seconds
+  const TOLERANCE_SECONDS = 60;       // 1 minute (60s) grace period / tolerance
   const LC_OFFSET = 180;             // 3 minutes before break
   const MAX_BREAK_COUNT = 4;
 
@@ -995,6 +996,11 @@
           const matikanLC = keluar - LC_OFFSET;
           const masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
 
+          const actualDuration = masuk - keluar;
+          const maxAllowed = chosenDuration + TOLERANCE_SECONDS;
+          const isLate = actualDuration > maxAllowed;
+          const isWithinTolerance = actualDuration > chosenDuration && actualDuration <= maxAllowed;
+
           breakRound.slots.push({
             staffId: staff.id,
             staffName: staff.name,
@@ -1003,6 +1009,9 @@
             matikanLC,
             keluar,
             masuk,
+            actualDuration,
+            isLate,
+            isWithinTolerance,
             isKeluarOverride: override.keluar !== undefined,
             isMasukOverride: override.masuk !== undefined,
             isCustom: chosenDuration !== defaultDuration
@@ -1125,10 +1134,22 @@
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
+          let inputClass = 'time-input masuk-input';
+          if (slot.isLate) inputClass += ' is-late';
+          else if (slot.isWithinTolerance) inputClass += ' is-tolerance';
+          else if (slot.isMasukOverride) inputClass += ' is-override';
+
           html += '<td class="time-cell masuk-cell">';
-          html += `<input type="text" maxlength="8" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
+          html += `<input type="text" maxlength="8" class="${inputClass}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
           html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="Klik atau paste jam masuk ${this._escHtml(slot.staffName)}">`;
+
+          if (slot.isLate) {
+            html += `<div class="tolerance-tag late-tag" title="Durasi ${formatDuration(slot.actualDuration)} melebihi batas toleransi 21:00m">⚠️ Telat (${formatDuration(slot.actualDuration)})</div>`;
+          } else if (slot.isWithinTolerance) {
+            html += `<div class="tolerance-tag safe-tag" title="Durasi ${formatDuration(slot.actualDuration)} (Toleransi +1m)">🛡️ Toleransi (${formatDuration(slot.actualDuration)})</div>`;
+          }
+
           html += '</td>';
         });
         html += '</tr>';
@@ -1150,6 +1171,7 @@
       let html = '';
       html += `<p>Total CS yang bertugas hari ini adalah <strong>${N} orang</strong>. Mohon kerjasamanya untuk mematuhi tabel jadwal di atas demi kenyamanan bersama.</p>`;
       html += `<p>🔄 <strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
+      html += `<p>🛡️ <strong>Toleransi 1 Menit:</strong> Setiap durasi break diberikan toleransi +1 menit. (Contoh: break 20m baru dianggap telat jika mencapai 21:00 menit).</p>`;
       html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong>.</p>`;
       html += `<p>Jadwal break berjalan berurutan dan baru berhenti hingga CS ke istirahat terakhir selesai pukul <strong>${endTime} WIB</strong>.</p>`;
 
