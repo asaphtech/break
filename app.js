@@ -7,7 +7,6 @@
   const TOTAL_SECONDS = 37620;        // 08:33:00 → 19:00:00
   const START_SECONDS = 30780;        // 08:33:00 as seconds from midnight
   const MAX_BREAK_DURATION = 1200;    // 20 minutes in seconds
-  const TOLERANCE_SECONDS = 60;       // 1 minute (60s) grace period / tolerance
   const LC_OFFSET = 180;             // 3 minutes before break
   const MAX_BREAK_COUNT = 4;
 
@@ -430,118 +429,6 @@
         if (icon) icon.textContent = '⚠️';
         badge.title = 'Mode Lokal / Gagal terhubung ke Cloud.';
       }
-    }
-  };
-
-  /* ============================================
-     Latoto Sync Service (Automatic & Paste Log Reader)
-     ============================================ */
-  const LatotoSync = {
-    staffMap: [
-      { id: 'def_01', name: 'PAT', fullName: 'ANDANI PARAPAT', keywords: ['ANDANI', 'PARAPAT', 'PATRICK', 'PAT'] },
-      { id: 'def_02', name: 'KKY', fullName: 'RIKKY CANDRA', keywords: ['RIKKY', 'CANDRA', 'KKY'] },
-      { id: 'def_03', name: 'SUN', fullName: 'CALVIN SUNDORO', keywords: ['CALVIN', 'SUNDORO', 'SUN'] },
-      { id: 'def_04', name: 'JOY', fullName: 'YOSUA HAMASEA SIRAIT', keywords: ['YOSUA', 'HAMASEA', 'SIRAIT', 'JOY'] },
-      { id: 'def_05', name: 'DON', fullName: 'DONI SAHAT P SIHITE', keywords: ['DONI', 'SAHAT', 'SIHITE', 'DON'] },
-      { id: 'def_06', name: 'STV', fullName: 'STEVAN', keywords: ['STEVAN', 'STV'] },
-      { id: 'def_07', name: 'LID', fullName: 'LIDIA ANDRIANI', keywords: ['LIDIA', 'ANDRIANI', 'LID'] },
-      { id: 'def_08', name: 'WIL', fullName: 'WILLY ARDI JAYA', keywords: ['WILLY', 'ARDI', 'JAYA', 'WIL'] },
-      { id: 'def_09', name: 'JUL', fullName: 'JULIUS NABABAN', keywords: ['JULIUS', 'NABABAN', 'JUL'] },
-      { id: 'def_10', name: 'JOHN', fullName: 'JOHN ALKER SIMANJUNTAK', keywords: ['JOHN', 'ALKER', 'SIMANJUNTAK', 'JOHN'] },
-      { id: 'def_11', name: 'WEN', fullName: 'WENI YUNIARSIH', keywords: ['WENI', 'YUNIARSIH', 'WEN'] }
-    ],
-
-    parseAndApplyLogs(htmlOrText, targetDate) {
-      if (!htmlOrText) return 0;
-
-      const date = targetDate || State.scheduleDate || new Date();
-      const allStaff = StaffManager.getAll();
-      const logs = [];
-
-      const rowMatches = htmlOrText.match(/<tr>[\s\S]*?<\/tr>/gi) || [];
-
-      if (rowMatches.length > 0) {
-        rowMatches.forEach(row => {
-          const rawName = row.match(/<span>(.*?)<\/span>/i)?.[1]?.trim() || row.match(/class="nama-cell"[^>]*>([\s\S]*?)<\/td>/i)?.[1]?.replace(/<[^>]+>/g, '').trim();
-          const times = [...row.matchAll(/(\d{2}:\d{2}:\d{2})\s*(?:WIB)?/gi)].map(m => m[1]);
-
-          if (rawName && times.length >= 2) {
-            logs.push({ rawName, keluar: times[0], masuk: times[1] });
-          }
-        });
-      } else {
-        const lines = htmlOrText.split(/\r?\n/);
-        lines.forEach(line => {
-          const times = [...line.matchAll(/(\d{2}:\d{2}:\d{2})/g)].map(m => m[1]);
-          if (times.length >= 2) {
-            const rawName = line.replace(/(\d{2}:\d{2}:\d{2})/g, '').trim();
-            logs.push({ rawName, keluar: times[0], masuk: times[1] });
-          }
-        });
-      }
-
-      if (logs.length === 0) return 0;
-
-      // Reverse so oldest break round (Break 1) is processed first
-      logs.reverse();
-
-      const roundCounters = {};
-      let countImported = 0;
-
-      logs.forEach(log => {
-        const matchedStaff = allStaff.find(s => {
-          const sName = s.name.toUpperCase();
-          const rName = log.rawName.toUpperCase();
-
-          const mapItem = this.staffMap.find(m => m.name === sName || m.id === s.id);
-          if (mapItem && mapItem.keywords.some(kw => rName.includes(kw))) return true;
-
-          return rName.includes(sName);
-        });
-
-        if (matchedStaff) {
-          roundCounters[matchedStaff.id] = (roundCounters[matchedStaff.id] || 0) + 1;
-          const roundNum = roundCounters[matchedStaff.id];
-
-          if (roundNum <= 4) {
-            BreakOverrideManager.setKeluar(date, matchedStaff.id, roundNum, log.keluar);
-            BreakOverrideManager.setMasuk(date, matchedStaff.id, roundNum, log.masuk);
-            countImported++;
-          }
-        }
-      });
-
-      return countImported;
-    },
-
-    async fetchAndSync(targetDate) {
-      const d = targetDate || State.scheduleDate || new Date();
-      const dateStr = toDateString(d);
-
-      // 1. Initial request to get CSRF token
-      const initRes = await fetch('https://latoto.marsipature.com/login.php');
-      const initHtml = await initRes.text();
-      const csrfMatch = initHtml.match(/name="csrf_token"\s+value="([^"]+)"/);
-      const csrf = csrfMatch ? csrfMatch[1] : '';
-
-      // 2. Login as rikky
-      const body = new URLSearchParams();
-      body.append('csrf_token', csrf);
-      body.append('username', 'rikky');
-      body.append('password', '1');
-
-      await fetch('https://latoto.marsipature.com/login.php', {
-        method: 'POST',
-        body: body,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-
-      // 3. Fetch Log Page
-      const logUrl = `https://latoto.marsipature.com/dashboard.php?page=tabelizin&view=normal&tanggal=${dateStr}&nama=&role=CS&source=logs`;
-      const logRes = await fetch(logUrl);
-      const logHtml = await logRes.text();
-
-      return this.parseAndApplyLogs(logHtml, d);
     }
   };
 
@@ -1110,11 +997,6 @@
           const matikanLC = keluar - LC_OFFSET;
           const masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
 
-          const actualDuration = masuk - keluar;
-          const maxAllowed = chosenDuration + TOLERANCE_SECONDS;
-          const isLate = actualDuration > maxAllowed;
-          const isWithinTolerance = actualDuration > chosenDuration && actualDuration <= maxAllowed;
-
           breakRound.slots.push({
             staffId: staff.id,
             staffName: staff.name,
@@ -1123,9 +1005,6 @@
             matikanLC,
             keluar,
             masuk,
-            actualDuration,
-            isLate,
-            isWithinTolerance,
             isKeluarOverride: override.keluar !== undefined,
             isMasukOverride: override.masuk !== undefined,
             isCustom: chosenDuration !== defaultDuration
@@ -1248,19 +1127,10 @@
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
-          let inputClass = 'time-input masuk-input';
-          if (slot.isLate) inputClass += ' is-late';
-          else if (slot.isMasukOverride) inputClass += ' is-override';
-
           html += '<td class="time-cell masuk-cell">';
-          html += `<input type="text" maxlength="8" class="${inputClass}" `;
+          html += `<input type="text" maxlength="8" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
           html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="Klik atau paste jam masuk ${this._escHtml(slot.staffName)}">`;
-
-          if (slot.isLate) {
-            html += `<div class="tolerance-tag late-tag" title="Durasi ${formatDuration(slot.actualDuration)} melebihi batas toleransi 21:00m">⚠️ Telat (${formatDuration(slot.actualDuration)})</div>`;
-          }
-
           html += '</td>';
         });
         html += '</tr>';
@@ -1282,7 +1152,6 @@
       let html = '';
       html += `<p>Total CS yang bertugas hari ini adalah <strong>${N} orang</strong>. Mohon kerjasamanya untuk mematuhi tabel jadwal di atas demi kenyamanan bersama.</p>`;
       html += `<p>🔄 <strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
-      html += `<p>🛡️ <strong>Toleransi 1 Menit:</strong> Setiap durasi break diberikan toleransi +1 menit. (Contoh: break 20m baru dianggap telat jika mencapai 21:00 menit).</p>`;
       html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong>.</p>`;
       html += `<p>Jadwal break berjalan berurutan dan baru berhenti hingga CS ke istirahat terakhir selesai pukul <strong>${endTime} WIB</strong>.</p>`;
 
@@ -1613,109 +1482,6 @@
             setTimeout(() => {
               handleTimeInput(input);
             }, 50);
-          }
-        });
-      }
-
-      // Latoto Sync Modal Controls
-      const syncLatotoBtn = document.getElementById('syncLatotoBtn');
-      const latotoModal = document.getElementById('latotoModal');
-      const closeLatotoModal = document.getElementById('closeLatotoModal');
-      const cancelLatoto = document.getElementById('cancelLatoto');
-      const btnLatotoAuto = document.getElementById('btnLatotoAuto');
-      const btnLatotoPaste = document.getElementById('btnLatotoPaste');
-      const latotoAutoSection = document.getElementById('latotoAutoSection');
-      const latotoPasteSection = document.getElementById('latotoPasteSection');
-      const startLatotoFetchBtn = document.getElementById('startLatotoFetchBtn');
-      const startLatotoParseBtn = document.getElementById('startLatotoParseBtn');
-      const latotoPasteInput = document.getElementById('latotoPasteInput');
-      const latotoStatus = document.getElementById('latotoStatusMsg');
-
-      const hideLatotoModal = () => {
-        if (latotoModal) latotoModal.classList.remove('show');
-      };
-
-      if (syncLatotoBtn) {
-        syncLatotoBtn.addEventListener('click', () => {
-          if (latotoStatus) latotoStatus.style.display = 'none';
-          if (latotoModal) latotoModal.classList.add('show');
-          if (latotoPasteInput) setTimeout(() => latotoPasteInput.focus(), 150);
-        });
-      }
-
-      if (closeLatotoModal) closeLatotoModal.addEventListener('click', hideLatotoModal);
-      if (cancelLatoto) cancelLatoto.addEventListener('click', hideLatotoModal);
-      if (latotoModal) {
-        latotoModal.addEventListener('click', (e) => {
-          if (e.target === latotoModal) hideLatotoModal();
-        });
-      }
-
-      if (btnLatotoAuto && btnLatotoPaste) {
-        btnLatotoAuto.addEventListener('click', () => {
-          btnLatotoAuto.className = 'btn-sm btn-primary';
-          btnLatotoPaste.className = 'btn-sm btn-secondary';
-          latotoAutoSection.style.display = 'block';
-          latotoPasteSection.style.display = 'none';
-        });
-
-        btnLatotoPaste.addEventListener('click', () => {
-          btnLatotoAuto.className = 'btn-sm btn-secondary';
-          btnLatotoPaste.className = 'btn-sm btn-primary';
-          latotoAutoSection.style.display = 'none';
-          latotoPasteSection.style.display = 'block';
-          setTimeout(() => latotoPasteInput.focus(), 150);
-        });
-      }
-
-      if (startLatotoFetchBtn) {
-        startLatotoFetchBtn.addEventListener('click', async () => {
-          latotoStatus.textContent = '🔄 Sedang terhubung ke Latoto & mengambil log...';
-          latotoStatus.style.color = 'var(--amber)';
-          latotoStatus.style.display = 'block';
-
-          try {
-            const count = await LatotoSync.fetchAndSync(State.scheduleDate);
-            if (count > 0) {
-              this.refreshSchedule();
-              latotoStatus.textContent = `✅ Berhasil mengimpor ${count} log break dari Latoto!`;
-              latotoStatus.style.color = 'var(--green)';
-              showToast(`Berhasil mengimpor ${count} log break Latoto! 🚀`, 'success');
-              setTimeout(hideLatotoModal, 1200);
-            } else {
-              latotoStatus.textContent = '⚠️ Tidak ditemukan log break CS untuk tanggal ini.';
-              latotoStatus.style.color = 'var(--amber)';
-            }
-          } catch (err) {
-            console.warn('Direct fetch error, suggesting paste fallback:', err);
-            latotoStatus.textContent = '💡 Gagal fetch otomatis (CORS/Browser). Silakan gunakan tab "📋 Paste Teks Log".';
-            latotoStatus.style.color = 'var(--amber)';
-          }
-        });
-      }
-
-      if (startLatotoParseBtn) {
-        startLatotoParseBtn.addEventListener('click', () => {
-          const text = latotoPasteInput.value.trim();
-          if (!text) {
-            latotoStatus.textContent = '⚠️ Harap paste teks/HTML tabel log Latoto terlebih dahulu!';
-            latotoStatus.style.color = 'var(--red)';
-            latotoStatus.style.display = 'block';
-            return;
-          }
-
-          const count = LatotoSync.parseAndApplyLogs(text, State.scheduleDate);
-          if (count > 0) {
-            this.refreshSchedule();
-            latotoStatus.textContent = `✅ Berhasil mengimpor ${count} log break dari teks paste!`;
-            latotoStatus.style.color = 'var(--green)';
-            latotoStatus.style.display = 'block';
-            showToast(`Berhasil mengimpor ${count} log break Latoto! 🚀`, 'success');
-            setTimeout(hideLatotoModal, 1200);
-          } else {
-            latotoStatus.textContent = '⚠️ Tidak dapat membaca log dari teks paste. Periksa kembali teks yang Anda salin.';
-            latotoStatus.style.color = 'var(--red)';
-            latotoStatus.style.display = 'block';
           }
         });
       }

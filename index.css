@@ -888,35 +888,7 @@ body::before {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.5) !important;
 }
 
-/* Late indicators */
-.time-input.is-late {
-  border-color: #ef4444 !important;
-  color: #fca5a5 !important;
-  background: rgba(239, 68, 68, 0.25) !important;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5) !important;
-}
 
-.tolerance-tag {
-  font-size: 0.72rem;
-  font-weight: 700;
-  margin-top: 3px;
-  border-radius: 4px;
-  padding: 2px 5px;
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.tolerance-tag.late-tag {
-  background: rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.6);
-  animation: pulse-late 1.5s infinite;
-}
-
-@keyframes pulse-late {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
 
 /* MASUK rows - Green */
 .row-masuk .label-cell {
