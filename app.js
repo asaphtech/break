@@ -767,6 +767,8 @@
           slots: []
         };
 
+        let currentPointer = roundStart;
+
         for (let i = 0; i < N; i++) {
           const staff = activeStaff[i];
           const chosenDuration = BreakChoiceManager.getStaffChoice(
@@ -776,7 +778,7 @@
             defaultDuration
           );
 
-          const keluar = roundStart + i * defaultDuration;
+          const keluar = currentPointer;
           const matikanLC = keluar - LC_OFFSET;
           const masuk = keluar + chosenDuration;
 
@@ -790,9 +792,13 @@
             masuk,
             isCustom: chosenDuration !== defaultDuration
           });
+
+          // Next staff in line goes out exactly when this staff member returns!
+          currentPointer = masuk;
         }
 
-        roundStart += N * defaultDuration;
+        // Next break round starts when the last staff member of this round finishes!
+        roundStart = currentPointer;
         schedule.breaks.push(breakRound);
       }
 
