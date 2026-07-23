@@ -48,6 +48,16 @@
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
+  function parseTimeToSeconds(str) {
+    if (!str) return null;
+    const parts = str.trim().split(':');
+    if (parts.length < 2) return null;
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    const s = parts[2] ? (parseInt(parts[2], 10) || 0) : 0;
+    return h * 3600 + m * 60 + s;
+  }
+
   function formatDuration(seconds) {
     const m = Math.floor(seconds / 60);
     const s = Math.round(seconds % 60);
@@ -196,7 +206,7 @@
             return;
           }
 
-          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {});
+          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {});
           if (hash !== this._lastHash) {
             this._lastHash = hash;
 
@@ -208,6 +218,9 @@
             }
             if (data.breakChoices) {
               Object.keys(data.breakChoices).forEach(k => Storage.set(k, data.breakChoices[k]));
+            }
+            if (data.breakOverrides) {
+              Object.keys(data.breakOverrides).forEach(k => Storage.set(k, data.breakOverrides[k]));
             }
             if (data.password) Storage.set('break_scheduler_pass', data.password);
 
@@ -245,6 +258,7 @@
         
         const attendance = {};
         const breakChoices = {};
+        const breakOverrides = {};
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('break_att_')) {
@@ -253,6 +267,9 @@
           if (key && key.startsWith('break_choice_')) {
             breakChoices[key] = Storage.get(key, {});
           }
+          if (key && key.startsWith('break_override_')) {
+            breakOverrides[key] = Storage.get(key, {});
+          }
         }
 
         const payload = {
@@ -260,10 +277,11 @@
           staff,
           attendance,
           breakChoices,
+          breakOverrides,
           password
         };
 
-        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices);
+        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides);
 
         let res;
         if (isSupa) {
@@ -814,6 +832,60 @@
   };
 
   /* ============================================
+     Break Override Manager (Manual KELUAR / MASUK Edits)
+     ============================================ */
+  const BreakOverrideManager = {
+    getOverrides(date) {
+      const dateStr = toDateString(date);
+      return Storage.get(`break_override_${dateStr}`, {});
+    },
+
+    setKeluar(date, staffId, roundNumber, timeStr) {
+      const dateStr = toDateString(date);
+      const overrides = this.getOverrides(date);
+      if (!overrides[staffId]) overrides[staffId] = {};
+      if (!overrides[staffId][`round_${roundNumber}`]) overrides[staffId][`round_${roundNumber}`] = {};
+
+      const secs = parseTimeToSeconds(timeStr);
+      if (secs !== null) {
+        overrides[staffId][`round_${roundNumber}`].keluar = secs;
+      } else {
+        delete overrides[staffId][`round_${roundNumber}`].keluar;
+      }
+      Storage.set(`break_override_${dateStr}`, overrides);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
+    },
+
+    setMasuk(date, staffId, roundNumber, timeStr) {
+      const dateStr = toDateString(date);
+      const overrides = this.getOverrides(date);
+      if (!overrides[staffId]) overrides[staffId] = {};
+      if (!overrides[staffId][`round_${roundNumber}`]) overrides[staffId][`round_${roundNumber}`] = {};
+
+      const secs = parseTimeToSeconds(timeStr);
+      if (secs !== null) {
+        overrides[staffId][`round_${roundNumber}`].masuk = secs;
+      } else {
+        delete overrides[staffId][`round_${roundNumber}`].masuk;
+      }
+      Storage.set(`break_override_${dateStr}`, overrides);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
+    },
+
+    getStaffOverride(date, staffId, roundNumber) {
+      const overrides = this.getOverrides(date);
+      if (overrides[staffId] && overrides[staffId][`round_${roundNumber}`]) {
+        return overrides[staffId][`round_${roundNumber}`];
+      }
+      return {};
+    }
+  };
+
+  /* ============================================
      Break Calculator
      ============================================ */
   const BreakCalculator = {
@@ -900,9 +972,15 @@
             defaultDuration
           );
 
-          const keluar = currentPointer;
+          const override = BreakOverrideManager.getStaffOverride(
+            targetDate,
+            staff.id,
+            r + 1
+          );
+
+          const keluar = (override.keluar !== undefined) ? override.keluar : currentPointer;
           const matikanLC = keluar - LC_OFFSET;
-          const masuk = keluar + chosenDuration;
+          const masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
 
           breakRound.slots.push({
             staffId: staff.id,
@@ -912,6 +990,8 @@
             matikanLC,
             keluar,
             masuk,
+            isKeluarOverride: override.keluar !== undefined,
+            isMasukOverride: override.masuk !== undefined,
             isCustom: chosenDuration !== defaultDuration
           });
 
@@ -998,11 +1078,15 @@
         });
         html += '</tr>';
 
-        // KELUAR row
+        // KELUAR row (Editable Time Input)
         html += '<tr class="row-keluar">';
         html += '<td class="label-cell">🚶 KELUAR</td>';
         br.slots.forEach(slot => {
-          html += `<td class="time-cell keluar-cell">${formatTime(slot.keluar)}</td>`;
+          html += '<td class="time-cell keluar-cell">';
+          html += `<input type="time" step="1" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
+          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="keluar" `;
+          html += `value="${formatTime(slot.keluar)}" title="Klik untuk mengedit jam keluar ${this._escHtml(slot.staffName)}">`;
+          html += '</td>';
         });
         html += '</tr>';
 
@@ -1024,11 +1108,15 @@
         });
         html += '</tr>';
 
-        // MASUK row
+        // MASUK row (Editable Time Input)
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
-          html += `<td class="time-cell masuk-cell">${formatTime(slot.masuk)}</td>`;
+          html += '<td class="time-cell masuk-cell">';
+          html += `<input type="time" step="1" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
+          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
+          html += `value="${formatTime(slot.masuk)}" title="Klik untuk mengedit jam masuk ${this._escHtml(slot.staffName)}">`;
+          html += '</td>';
         });
         html += '</tr>';
       });
@@ -1322,15 +1410,33 @@
       if (wrapper) {
         wrapper.addEventListener('change', (e) => {
           const select = e.target.closest('.duration-select');
-          if (!select) return;
+          if (select) {
+            const staffId = select.dataset.staffId;
+            const roundNumber = parseInt(select.dataset.round, 10);
+            const durationSeconds = parseInt(select.value, 10);
 
-          const staffId = select.dataset.staffId;
-          const roundNumber = parseInt(select.dataset.round, 10);
-          const durationSeconds = parseInt(select.value, 10);
+            BreakChoiceManager.setChoice(State.scheduleDate, staffId, roundNumber, durationSeconds);
+            this.refreshSchedule();
+            showToast('Pilihan durasi break berhasil diperbarui! ⏱️', 'success');
+            return;
+          }
 
-          BreakChoiceManager.setChoice(State.scheduleDate, staffId, roundNumber, durationSeconds);
-          this.refreshSchedule();
-          showToast('Pilihan durasi break berhasil diperbarui! ⏱️', 'success');
+          const input = e.target.closest('.time-input');
+          if (input) {
+            const staffId = input.dataset.staffId;
+            const roundNumber = parseInt(input.dataset.round, 10);
+            const type = input.dataset.type;
+            const val = input.value.trim();
+
+            if (type === 'keluar') {
+              BreakOverrideManager.setKeluar(State.scheduleDate, staffId, roundNumber, val);
+            } else if (type === 'masuk') {
+              BreakOverrideManager.setMasuk(State.scheduleDate, staffId, roundNumber, val);
+            }
+
+            this.refreshSchedule();
+            showToast(`Jam ${type} berhasil disesuaikan! ⏰`, 'success');
+          }
         });
       }
     },
