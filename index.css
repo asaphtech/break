@@ -802,13 +802,13 @@ body::before {
 }
 
 .duration-select {
-  background: rgba(15, 23, 42, 0.85);
-  color: #a78bfa;
-  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: #1e1b4b;
+  color: #c084fc;
+  border: 1.5px solid #a855f7;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   outline: none;
@@ -819,16 +819,30 @@ body::before {
 }
 
 .duration-select:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--purple);
+  background: #312e81;
+  border-color: #c084fc;
   color: #ffffff;
 }
 
+.duration-select option {
+  background-color: #0f172a !important;
+  color: #38bdf8 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  padding: 8px !important;
+}
+
 .duration-select.custom-chosen {
-  background: rgba(245, 158, 11, 0.25);
-  color: #fde047;
-  border-color: rgba(245, 158, 11, 0.6);
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+  background: #78350f !important;
+  color: #fef08a !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+.duration-select.custom-chosen option {
+  background-color: #0f172a !important;
+  color: #fde047 !important;
 }
 
 /* MASUK rows - Green */
