@@ -133,7 +133,6 @@
 
     async pullData(isInitial = false) {
       if (this._syncing) return;
-      // Browsers block cross-origin HTTPS fetch from file:// protocol due to CORS policy
       if (window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
         return;
@@ -146,12 +145,23 @@
         if (!res.ok) throw new Error('Cloud pull failed');
         const data = await res.json();
 
-        if (data && typeof data === 'object' && data.staff) {
-          const hash = JSON.stringify(data);
+        if (data && typeof data === 'object' && Array.isArray(data.staff)) {
+          const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
+          const cloudUpdatedAt = data.updatedAt || '';
+
+          // If local data is newer than cloud data, push local data to cloud instead of overwriting!
+          if (localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
+            this.pushData();
+            return;
+          }
+
+          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {});
           if (hash !== this._lastHash) {
             this._lastHash = hash;
 
-            if (data.staff) Storage.setStaff(data.staff);
+            if (data.staff && data.staff.length > 0) {
+              Storage.setStaff(data.staff);
+            }
             if (data.attendance) {
               Object.keys(data.attendance).forEach(key => {
                 Storage.set(key, data.attendance[key]);
@@ -173,7 +183,9 @@
     },
 
     async pushData() {
-      // Local storage is already updated before pushData is called
+      const nowIso = new Date().toISOString();
+      Storage.set('break_scheduler_updated_at', nowIso);
+
       if (window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
         showToast('Data tersimpan secara lokal!', 'success');
@@ -195,13 +207,13 @@
         }
 
         const payload = {
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso,
           staff,
           attendance,
           password
         };
 
-        this._lastHash = JSON.stringify(payload);
+        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance);
 
         const res = await fetch(this.getEndpoint(), {
           method: 'PUT',
