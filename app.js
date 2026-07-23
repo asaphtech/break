@@ -133,6 +133,12 @@
 
     async pullData(isInitial = false) {
       if (this._syncing) return;
+      // Browsers block cross-origin HTTPS fetch from file:// protocol due to CORS policy
+      if (window.location.protocol === 'file:') {
+        this.updateBadge('offline', 'Lokal (file://)');
+        return;
+      }
+
       try {
         const res = await fetch(this.getEndpoint(), {
           headers: { 'Accept': 'application/json' }
@@ -167,6 +173,13 @@
     },
 
     async pushData() {
+      // Local storage is already updated before pushData is called
+      if (window.location.protocol === 'file:') {
+        this.updateBadge('offline', 'Lokal (file://)');
+        showToast('Data tersimpan secara lokal!', 'success');
+        return;
+      }
+
       try {
         this.updateBadge('syncing', 'Menyimpan...');
 
@@ -208,7 +221,7 @@
       } catch (err) {
         console.warn('CloudSync push error:', err);
         this.updateBadge('offline', 'Gagal Sync');
-        showToast('Gagal menyimpan ke Cloud (Offline mode)', 'error');
+        showToast('Tersimpan di lokal (Gagal koneksi Cloud)', 'info');
       }
     },
 
