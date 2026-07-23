@@ -221,7 +221,7 @@
             return;
           }
 
-          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {});
+          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.password || '');
           if (hash !== this._lastHash) {
             this._lastHash = hash;
 
@@ -296,7 +296,7 @@
           password
         };
 
-        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides);
+        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides) + JSON.stringify(password || '');
 
         let res;
         if (isSupa) {
@@ -450,6 +450,7 @@
 
     setPassword(newPass) {
       Storage.set('break_scheduler_pass', newPass);
+      Storage.set('break_scheduler_updated_at', new Date().toISOString());
       if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
         CloudSync.pushData();
       }
