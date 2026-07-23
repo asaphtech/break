@@ -1639,6 +1639,7 @@
         syncLatotoBtn.addEventListener('click', () => {
           if (latotoStatus) latotoStatus.style.display = 'none';
           if (latotoModal) latotoModal.classList.add('show');
+          if (latotoPasteInput) setTimeout(() => latotoPasteInput.focus(), 150);
         });
       }
 
