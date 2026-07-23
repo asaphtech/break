@@ -50,11 +50,24 @@
 
   function parseTimeToSeconds(str) {
     if (!str) return null;
-    const parts = str.trim().split(':');
+    let clean = str.trim().replace(/[.,\s]+/g, ':');
+
+    if (/^\d{6}$/.test(clean)) {
+      clean = `${clean.substring(0,2)}:${clean.substring(2,4)}:${clean.substring(4,6)}`;
+    } else if (/^\d{4}$/.test(clean)) {
+      clean = `${clean.substring(0,2)}:${clean.substring(2,4)}:00`;
+    }
+
+    const parts = clean.split(':');
     if (parts.length < 2) return null;
-    const h = parseInt(parts[0], 10) || 0;
-    const m = parseInt(parts[1], 10) || 0;
-    const s = parts[2] ? (parseInt(parts[2], 10) || 0) : 0;
+
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const s = parts[2] !== undefined ? parseInt(parts[2], 10) : 0;
+
+    if (isNaN(h) || isNaN(m) || isNaN(s)) return null;
+    if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) return null;
+
     return h * 3600 + m * 60 + s;
   }
 
@@ -1078,14 +1091,14 @@
         });
         html += '</tr>';
 
-        // KELUAR row (Editable Time Input)
+        // KELUAR row (Editable Text Input for easy typing & pasting)
         html += '<tr class="row-keluar">';
         html += '<td class="label-cell">🚶 KELUAR</td>';
         br.slots.forEach(slot => {
           html += '<td class="time-cell keluar-cell">';
-          html += `<input type="time" step="1" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
+          html += `<input type="text" maxlength="8" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="keluar" `;
-          html += `value="${formatTime(slot.keluar)}" title="Klik untuk mengedit jam keluar ${this._escHtml(slot.staffName)}">`;
+          html += `value="${formatTime(slot.keluar)}" placeholder="00:00:00" title="Klik atau paste jam keluar ${this._escHtml(slot.staffName)}">`;
           html += '</td>';
         });
         html += '</tr>';
@@ -1108,14 +1121,14 @@
         });
         html += '</tr>';
 
-        // MASUK row (Editable Time Input)
+        // MASUK row (Editable Text Input for easy typing & pasting)
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
           html += '<td class="time-cell masuk-cell">';
-          html += `<input type="time" step="1" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
+          html += `<input type="text" maxlength="8" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
-          html += `value="${formatTime(slot.masuk)}" title="Klik untuk mengedit jam masuk ${this._escHtml(slot.staffName)}">`;
+          html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="Klik atau paste jam masuk ${this._escHtml(slot.staffName)}">`;
           html += '</td>';
         });
         html += '</tr>';
@@ -1408,6 +1421,22 @@
 
       const wrapper = document.getElementById('scheduleTableWrapper');
       if (wrapper) {
+        const handleTimeInput = (input) => {
+          const staffId = input.dataset.staffId;
+          const roundNumber = parseInt(input.dataset.round, 10);
+          const type = input.dataset.type;
+          const val = input.value.trim();
+
+          if (type === 'keluar') {
+            BreakOverrideManager.setKeluar(State.scheduleDate, staffId, roundNumber, val);
+          } else if (type === 'masuk') {
+            BreakOverrideManager.setMasuk(State.scheduleDate, staffId, roundNumber, val);
+          }
+
+          this.refreshSchedule();
+          showToast(`Jam ${type} berhasil disesuaikan! ⏰`, 'success');
+        };
+
         wrapper.addEventListener('change', (e) => {
           const select = e.target.closest('.duration-select');
           if (select) {
@@ -1423,19 +1452,34 @@
 
           const input = e.target.closest('.time-input');
           if (input) {
-            const staffId = input.dataset.staffId;
-            const roundNumber = parseInt(input.dataset.round, 10);
-            const type = input.dataset.type;
-            const val = input.value.trim();
+            handleTimeInput(input);
+          }
+        });
 
-            if (type === 'keluar') {
-              BreakOverrideManager.setKeluar(State.scheduleDate, staffId, roundNumber, val);
-            } else if (type === 'masuk') {
-              BreakOverrideManager.setMasuk(State.scheduleDate, staffId, roundNumber, val);
+        // Auto select text on click/focus so Ctrl+V paste replaces whole value immediately
+        wrapper.addEventListener('focusin', (e) => {
+          const input = e.target.closest('.time-input');
+          if (input) input.select();
+        });
+
+        // Pressing Enter updates and blurs
+        wrapper.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const input = e.target.closest('.time-input');
+            if (input) {
+              e.preventDefault();
+              input.blur();
             }
+          }
+        });
 
-            this.refreshSchedule();
-            showToast(`Jam ${type} berhasil disesuaikan! ⏰`, 'success');
+        // Instant paste handling
+        wrapper.addEventListener('paste', (e) => {
+          const input = e.target.closest('.time-input');
+          if (input) {
+            setTimeout(() => {
+              handleTimeInput(input);
+            }, 50);
           }
         });
       }
