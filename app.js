@@ -167,6 +167,11 @@
                 Storage.set(key, data.attendance[key]);
               });
             }
+            if (data.breakChoices) {
+              Object.keys(data.breakChoices).forEach(key => {
+                Storage.set(key, data.breakChoices[key]);
+              });
+            }
             if (data.password) Storage.set('break_scheduler_pass', data.password);
 
             StaffManager.init();
@@ -199,10 +204,14 @@
         const password = AuthManager.getPassword();
         
         const attendance = {};
+        const breakChoices = {};
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('break_att_')) {
             attendance[key] = Storage.get(key, {});
+          }
+          if (key && key.startsWith('break_choice_')) {
+            breakChoices[key] = Storage.get(key, {});
           }
         }
 
@@ -210,6 +219,7 @@
           updatedAt: nowIso,
           staff,
           attendance,
+          breakChoices,
           password
         };
 
@@ -653,6 +663,35 @@
   };
 
   /* ============================================
+     Break Choice Manager (Staff Custom Duration)
+     ============================================ */
+  const BreakChoiceManager = {
+    getChoices(date) {
+      const dateStr = toDateString(date);
+      return Storage.get(`break_choice_${dateStr}`, {});
+    },
+
+    setChoice(date, staffId, roundNumber, durationSeconds) {
+      const dateStr = toDateString(date);
+      const choices = this.getChoices(date);
+      if (!choices[staffId]) choices[staffId] = {};
+      choices[staffId][`round_${roundNumber}`] = durationSeconds;
+      Storage.set(`break_choice_${dateStr}`, choices);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
+    },
+
+    getStaffChoice(date, staffId, roundNumber, defaultDuration) {
+      const choices = this.getChoices(date);
+      if (choices[staffId] && choices[staffId][`round_${roundNumber}`]) {
+        return choices[staffId][`round_${roundNumber}`];
+      }
+      return defaultDuration;
+    }
+  };
+
+  /* ============================================
      Break Calculator
      ============================================ */
   const BreakCalculator = {
@@ -705,43 +744,55 @@
     /**
      * Generate the full break schedule for a list of active staff.
      */
-    generateSchedule(activeStaff) {
+    generateSchedule(activeStaff, date) {
       const N = activeStaff.length;
       if (N === 0) return null;
 
-      const durations = this.calculateDurations(N);
+      const targetDate = date || State.scheduleDate || new Date();
+      const defaultDurations = this.calculateDurations(N);
       const schedule = {
         staffCount: N,
         staff: activeStaff,
-        durations: durations,
+        durations: defaultDurations,
         breaks: []
       };
 
       let roundStart = START_SECONDS;
 
       for (let r = 0; r < MAX_BREAK_COUNT; r++) {
-        const duration = durations[r];
+        const defaultDuration = defaultDurations[r];
         const breakRound = {
           roundNumber: r + 1,
-          duration: duration,
+          defaultDuration: defaultDuration,
           slots: []
         };
 
         for (let i = 0; i < N; i++) {
-          const keluar = roundStart + i * duration;
+          const staff = activeStaff[i];
+          const chosenDuration = BreakChoiceManager.getStaffChoice(
+            targetDate,
+            staff.id,
+            r + 1,
+            defaultDuration
+          );
+
+          const keluar = roundStart + i * defaultDuration;
           const matikanLC = keluar - LC_OFFSET;
-          const masuk = keluar + duration;
+          const masuk = keluar + chosenDuration;
 
           breakRound.slots.push({
-            staffId: activeStaff[i].id,
-            staffName: activeStaff[i].name,
+            staffId: staff.id,
+            staffName: staff.name,
+            chosenDuration,
+            defaultDuration,
             matikanLC,
             keluar,
-            masuk
+            masuk,
+            isCustom: chosenDuration !== defaultDuration
           });
         }
 
-        roundStart += N * duration;
+        roundStart += N * defaultDuration;
         schedule.breaks.push(breakRound);
       }
 
@@ -788,7 +839,7 @@
         return;
       }
 
-      const schedule = BreakCalculator.generateSchedule(activeStaff);
+      const schedule = BreakCalculator.generateSchedule(activeStaff, date);
       wrapper.innerHTML = this._buildTable(schedule);
       footer.innerHTML = this._buildFooter(schedule);
     },
@@ -808,7 +859,7 @@
         // Break group header
         html += `<tr class="break-header-row"><td colspan="${N + 1}" class="break-header-cell">`;
         html += `<span class="break-label">Break ${br.roundNumber}</span>`;
-        html += `<span class="break-duration-badge">${formatDuration(br.duration)}</span>`;
+        html += `<span class="break-duration-badge">Default: ${formatDuration(br.defaultDuration)}</span>`;
         html += '</td></tr>';
 
         // MATIKAN LC row
@@ -824,6 +875,24 @@
         html += '<td class="label-cell">🚶 KELUAR</td>';
         br.slots.forEach(slot => {
           html += `<td class="time-cell keluar-cell">${formatTime(slot.keluar)}</td>`;
+        });
+        html += '</tr>';
+
+        // DURASI row (Staff Duration Selector)
+        html += '<tr class="row-durasi">';
+        html += '<td class="label-cell">⏱️ DURASI</td>';
+        br.slots.forEach(slot => {
+          html += '<td class="time-cell durasi-cell">';
+          html += `<select class="duration-select ${slot.isCustom ? 'custom-chosen' : ''}" `;
+          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" `;
+          html += `title="Pilih opsi durasi break untuk ${this._escHtml(slot.staffName)}">`;
+
+          schedule.durations.forEach(durSec => {
+            const isSelected = slot.chosenDuration === durSec;
+            html += `<option value="${durSec}" ${isSelected ? 'selected' : ''}>${formatDuration(durSec)}</option>`;
+          });
+
+          html += '</select></td>';
         });
         html += '</tr>';
 
@@ -1120,6 +1189,22 @@
       printBtn.addEventListener('click', () => {
         window.print();
       });
+
+      const wrapper = document.getElementById('scheduleTableWrapper');
+      if (wrapper) {
+        wrapper.addEventListener('change', (e) => {
+          const select = e.target.closest('.duration-select');
+          if (!select) return;
+
+          const staffId = select.dataset.staffId;
+          const roundNumber = parseInt(select.dataset.round, 10);
+          const durationSeconds = parseInt(select.value, 10);
+
+          BreakChoiceManager.setChoice(State.scheduleDate, staffId, roundNumber, durationSeconds);
+          this.refreshSchedule();
+          showToast('Pilihan durasi break berhasil diperbarui! ⏱️', 'success');
+        });
+      }
     },
 
     /* ---- Staff Controls ---- */
