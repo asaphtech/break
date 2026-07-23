@@ -247,6 +247,36 @@
     </div>
   </div>
 
+  <!-- ========== Supabase Config Modal ========== -->
+  <div class="modal-overlay" id="supabaseModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⚡ Pengaturan Database Supabase</h3>
+        <button class="modal-close" id="closeSupabaseModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:14px;color:var(--text-secondary);font-size:0.85rem;">
+          Hubungkan aplikasi ke Supabase agar seluruh data tersimpan permanen di cloud dan tersinkronisasi otomatis antar PC.
+        </p>
+        <form id="supabaseForm" onsubmit="return false;">
+          <div class="form-group">
+            <label for="supabaseUrlInput">Supabase Project URL</label>
+            <input type="url" id="supabaseUrlInput" class="form-input" placeholder="https://xyz.supabase.co" required>
+          </div>
+          <div class="form-group">
+            <label for="supabaseKeyInput">Supabase Anon Key (API Key)</label>
+            <input type="password" id="supabaseKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1Ni..." required>
+          </div>
+          <div id="supabaseStatusMsg" style="display:none;font-size:0.85rem;margin-top:6px;font-weight:600;"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancelSupabase" type="button">Batal</button>
+        <button class="btn-primary" id="saveSupabase" type="button">Hubungkan & Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== Toast Container ========== -->
   <div class="toast-container" id="toastContainer"></div>
 

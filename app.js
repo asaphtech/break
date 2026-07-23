@@ -118,9 +118,21 @@
 
     init() {
       this.updateBadge('syncing', 'Menghubungkan...');
+      this._setupModalListeners();
       this.pullData(true).then(() => {
         this.startAutoPoll();
       });
+    },
+
+    getSupabaseConfig() {
+      const url = Storage.get('break_scheduler_supabase_url', '');
+      const key = Storage.get('break_scheduler_supabase_key', '');
+      return { url, key, isConfigured: Boolean(url && key) };
+    },
+
+    setSupabaseConfig(url, key) {
+      Storage.set('break_scheduler_supabase_url', url);
+      Storage.set('break_scheduler_supabase_key', key);
     },
 
     getEndpoint() {
@@ -133,29 +145,49 @@
 
     async pullData(isInitial = false) {
       if (this._syncing) return;
-      if (window.location.protocol === 'file:') {
+
+      const supa = this.getSupabaseConfig();
+      const isSupa = supa.isConfigured;
+
+      if (!isSupa && window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
         return;
       }
 
       try {
-        const res = await fetch(this.getEndpoint(), {
-          headers: { 'Accept': 'application/json' }
-        });
-        if (!res.ok) throw new Error('Cloud pull failed');
-        const data = await res.json();
+        let data = null;
+
+        if (isSupa) {
+          const res = await fetch(`${supa.url}/rest/v1/break_scheduler_data?key=eq.main_state&select=*`, {
+            headers: {
+              'apikey': supa.key,
+              'Authorization': `Bearer ${supa.key}`,
+              'Accept': 'application/json'
+            }
+          });
+          if (!res.ok) throw new Error('Supabase pull failed');
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            data = rows[0].value;
+          }
+        } else {
+          const res = await fetch(this.getEndpoint(), {
+            headers: { 'Accept': 'application/json' }
+          });
+          if (!res.ok) throw new Error('Cloud pull failed');
+          data = await res.json();
+        }
 
         if (data && typeof data === 'object' && Array.isArray(data.staff)) {
           const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
           const cloudUpdatedAt = data.updatedAt || '';
 
-          // If local data is newer than cloud data, push local data to cloud instead of overwriting!
           if (localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
             this.pushData();
             return;
           }
 
-          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {});
+          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {});
           if (hash !== this._lastHash) {
             this._lastHash = hash;
 
@@ -163,14 +195,10 @@
               Storage.setStaff(data.staff);
             }
             if (data.attendance) {
-              Object.keys(data.attendance).forEach(key => {
-                Storage.set(key, data.attendance[key]);
-              });
+              Object.keys(data.attendance).forEach(k => Storage.set(k, data.attendance[k]));
             }
             if (data.breakChoices) {
-              Object.keys(data.breakChoices).forEach(key => {
-                Storage.set(key, data.breakChoices[key]);
-              });
+              Object.keys(data.breakChoices).forEach(k => Storage.set(k, data.breakChoices[k]));
             }
             if (data.password) Storage.set('break_scheduler_pass', data.password);
 
@@ -179,7 +207,7 @@
               App.refreshAll();
             }
           }
-          this.updateBadge('online', 'Cloud Live');
+          this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
         }
       } catch (err) {
         console.warn('CloudSync pull error:', err);
@@ -191,7 +219,10 @@
       const nowIso = new Date().toISOString();
       Storage.set('break_scheduler_updated_at', nowIso);
 
-      if (window.location.protocol === 'file:') {
+      const supa = this.getSupabaseConfig();
+      const isSupa = supa.isConfigured;
+
+      if (!isSupa && window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
         showToast('Data tersimpan secara lokal!', 'success');
         return;
@@ -223,27 +254,109 @@
           password
         };
 
-        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance);
+        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices);
 
-        const res = await fetch(this.getEndpoint(), {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+        let res;
+        if (isSupa) {
+          res = await fetch(`${supa.url}/rest/v1/break_scheduler_data`, {
+            method: 'POST',
+            headers: {
+              'apikey': supa.key,
+              'Authorization': `Bearer ${supa.key}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([{
+              key: 'main_state',
+              value: payload,
+              updated_at: nowIso
+            }])
+          });
+        } else {
+          res = await fetch(this.getEndpoint(), {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+        }
 
         if (res.ok) {
-          this.updateBadge('online', 'Cloud Live');
-          showToast('Data tersinkronisasi ke Cloud! ☁️', 'success');
+          this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
+          showToast(isSupa ? 'Data tersimpan ke Supabase! ⚡' : 'Data tersinkronisasi ke Cloud! ☁️', 'success');
         } else {
           throw new Error('Push failed');
         }
       } catch (err) {
         console.warn('CloudSync push error:', err);
         this.updateBadge('offline', 'Gagal Sync');
-        showToast('Tersimpan di lokal (Gagal koneksi Cloud)', 'info');
+        showToast('Gagal terhubung ke Cloud (Tersimpan di lokal)', 'info');
+      }
+    },
+
+    startAutoPoll() {
+      if (this._pollTimer) clearInterval(this._pollTimer);
+      this._pollTimer = setInterval(() => {
+        this.pullData(false);
+      }, 10000);
+    },
+
+    _setupModalListeners() {
+      const cloudBadge = document.getElementById('cloudBadge');
+      const supaModal = document.getElementById('supabaseModal');
+      const closeSupaModal = document.getElementById('closeSupabaseModal');
+      const cancelSupa = document.getElementById('cancelSupabase');
+      const saveSupa = document.getElementById('saveSupabase');
+      const supaUrlInput = document.getElementById('supabaseUrlInput');
+      const supaKeyInput = document.getElementById('supabaseKeyInput');
+      const supaStatus = document.getElementById('supabaseStatusMsg');
+
+      if (cloudBadge) {
+        cloudBadge.style.cursor = 'pointer';
+        cloudBadge.addEventListener('click', () => {
+          const cfg = this.getSupabaseConfig();
+          supaUrlInput.value = cfg.url;
+          supaKeyInput.value = cfg.key;
+          supaStatus.style.display = 'none';
+          supaModal.classList.add('show');
+          setTimeout(() => supaUrlInput.focus(), 150);
+        });
+      }
+
+      const hideSupaModal = () => {
+        if (supaModal) supaModal.classList.remove('show');
+      };
+
+      if (closeSupaModal) closeSupaModal.addEventListener('click', hideSupaModal);
+      if (cancelSupa) cancelSupa.addEventListener('click', hideSupaModal);
+      if (supaModal) {
+        supaModal.addEventListener('click', (e) => {
+          if (e.target === supaModal) hideSupaModal();
+        });
+      }
+
+      if (saveSupa) {
+        saveSupa.addEventListener('click', async () => {
+          const url = supaUrlInput.value.trim().replace(/\/+$/, '');
+          const key = supaKeyInput.value.trim();
+
+          if (!url || !key) {
+            supaStatus.textContent = '⚠️ Harap isi Supabase URL dan API Key!';
+            supaStatus.style.color = 'var(--red)';
+            supaStatus.style.display = 'block';
+            return;
+          }
+
+          this.setSupabaseConfig(url, key);
+          supaStatus.textContent = '🔄 Menguji koneksi Supabase...';
+          supaStatus.style.color = 'var(--amber)';
+          supaStatus.style.display = 'block';
+
+          await this.pushData();
+          hideSupaModal();
+        });
       }
     },
 
