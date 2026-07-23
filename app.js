@@ -32,6 +32,8 @@
     { id: 'def_07', name: 'LID', order: 7 },
     { id: 'def_08', name: 'WIL', order: 8 },
     { id: 'def_09', name: 'JUL', order: 9 },
+    { id: 'def_10', name: 'JOHN', order: 10 },
+    { id: 'def_11', name: 'WEN', order: 11 }
   ];
 
   /* ============================================
@@ -436,15 +438,17 @@
      ============================================ */
   const LatotoSync = {
     staffMap: [
-      { id: 'def_01', name: 'PAT', keywords: ['PARAPAT', 'PATRICK', 'PAT'] },
-      { id: 'def_02', name: 'KKY', keywords: ['RIKKY', 'KKY'] },
-      { id: 'def_03', name: 'SUN', keywords: ['CALVIN', 'SUNDORO', 'SUN'] },
-      { id: 'def_04', name: 'JOY', keywords: ['YOSUA', 'JOY'] },
-      { id: 'def_05', name: 'DON', keywords: ['DONI', 'DON'] },
-      { id: 'def_06', name: 'STV', keywords: ['STEVAN', 'STV'] },
-      { id: 'def_07', name: 'LID', keywords: ['LIDIA', 'LID'] },
-      { id: 'def_08', name: 'WIL', keywords: ['WILLY', 'WIL'] },
-      { id: 'def_09', name: 'JUL', keywords: ['JULIUS', 'JUL'] }
+      { id: 'def_01', name: 'PAT', fullName: 'ANDANI PARAPAT', keywords: ['ANDANI', 'PARAPAT', 'PATRICK', 'PAT'] },
+      { id: 'def_02', name: 'KKY', fullName: 'RIKKY CANDRA', keywords: ['RIKKY', 'CANDRA', 'KKY'] },
+      { id: 'def_03', name: 'SUN', fullName: 'CALVIN SUNDORO', keywords: ['CALVIN', 'SUNDORO', 'SUN'] },
+      { id: 'def_04', name: 'JOY', fullName: 'YOSUA HAMASEA SIRAIT', keywords: ['YOSUA', 'HAMASEA', 'SIRAIT', 'JOY'] },
+      { id: 'def_05', name: 'DON', fullName: 'DONI SAHAT P SIHITE', keywords: ['DONI', 'SAHAT', 'SIHITE', 'DON'] },
+      { id: 'def_06', name: 'STV', fullName: 'STEVAN', keywords: ['STEVAN', 'STV'] },
+      { id: 'def_07', name: 'LID', fullName: 'LIDIA ANDRIANI', keywords: ['LIDIA', 'ANDRIANI', 'LID'] },
+      { id: 'def_08', name: 'WIL', fullName: 'WILLY ARDI JAYA', keywords: ['WILLY', 'ARDI', 'JAYA', 'WIL'] },
+      { id: 'def_09', name: 'JUL', fullName: 'JULIUS NABABAN', keywords: ['JULIUS', 'NABABAN', 'JUL'] },
+      { id: 'def_10', name: 'JOHN', fullName: 'JOHN ALKER SIMANJUNTAK', keywords: ['JOHN', 'ALKER', 'SIMANJUNTAK', 'JOHN'] },
+      { id: 'def_11', name: 'WEN', fullName: 'WENI YUNIARSIH', keywords: ['WENI', 'YUNIARSIH', 'WEN'] }
     ],
 
     parseAndApplyLogs(htmlOrText, targetDate) {
