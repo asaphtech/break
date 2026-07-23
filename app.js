@@ -954,6 +954,66 @@
   };
 
   /* ============================================
+     Break Status Manager (Done / Selesai Tracking)
+     ============================================ */
+  const BreakStatusManager = {
+    getStatusMap(date) {
+      const dateStr = toDateString(date);
+      return Storage.get(`break_status_${dateStr}`, {});
+    },
+
+    isCompleted(date, staffId, roundNumber) {
+      const map = this.getStatusMap(date);
+      return Boolean(map[staffId] && map[staffId][`round_${roundNumber}`]);
+    },
+
+    toggleStatus(date, staffId, roundNumber) {
+      const dateStr = toDateString(date);
+      const map = this.getStatusMap(date);
+      if (!map[staffId]) map[staffId] = {};
+
+      const current = Boolean(map[staffId][`round_${roundNumber}`]);
+      if (current) {
+        delete map[staffId][`round_${roundNumber}`];
+      } else {
+        map[staffId][`round_${roundNumber}`] = true;
+      }
+
+      Storage.set(`break_status_${dateStr}`, map);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
+      return !current;
+    },
+
+    resetRound(date, roundNumber) {
+      const dateStr = toDateString(date);
+      const map = this.getStatusMap(date);
+      let changed = false;
+      Object.keys(map).forEach(staffId => {
+        if (map[staffId] && map[staffId][`round_${roundNumber}`]) {
+          delete map[staffId][`round_${roundNumber}`];
+          changed = true;
+        }
+      });
+      if (changed) {
+        Storage.set(`break_status_${dateStr}`, map);
+        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+          CloudSync.pushData();
+        }
+      }
+    },
+
+    resetAll(date) {
+      const dateStr = toDateString(date);
+      Storage.remove(`break_status_${dateStr}`);
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData();
+      }
+    }
+  };
+
+  /* ============================================
      Break Calculator
      ============================================ */
   const BreakCalculator = {
@@ -1049,6 +1109,18 @@
           const keluar = (override.keluar !== undefined) ? override.keluar : currentPointer;
           const matikanLC = keluar - LC_OFFSET;
           const masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
+          const isCompleted = BreakStatusManager.isCompleted(targetDate, staff.id, r + 1);
+          const actualDuration = masuk - keluar;
+
+          let isExceeded = actualDuration > chosenDuration;
+          const isToday = toDateString(targetDate) === toDateString(new Date());
+          if (isToday && !isCompleted) {
+            const now = new Date();
+            const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            if (nowSec > masuk) {
+              isExceeded = true;
+            }
+          }
 
           breakRound.slots.push({
             staffId: staff.id,
@@ -1058,6 +1130,9 @@
             matikanLC,
             keluar,
             masuk,
+            actualDuration,
+            isCompleted,
+            isExceeded,
             isKeluarOverride: override.keluar !== undefined,
             isMasukOverride: override.masuk !== undefined,
             isCustom: chosenDuration !== defaultDuration
@@ -1215,11 +1290,32 @@
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
+          let inputClass = 'time-input masuk-input';
+          if (slot.isExceeded) inputClass += ' is-exceeded';
+          else if (slot.isMasukOverride) inputClass += ' is-override';
+
+          const titleMsg = slot.isExceeded
+            ? `⚠️ Durasi break ${this._escHtml(slot.staffName)} melebihi ${formatDuration(slot.chosenDuration)}!`
+            : `Klik atau paste jam masuk ${this._escHtml(slot.staffName)}`;
+
           html += '<td class="time-cell masuk-cell">';
-          html += `<input type="text" maxlength="8" class="time-input masuk-input ${slot.isMasukOverride ? 'is-override' : ''}" `;
+          html += `<input type="text" maxlength="8" class="${inputClass}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
-          html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="Klik atau paste jam masuk ${this._escHtml(slot.staffName)}">`;
+          html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="${titleMsg}">`;
           html += '</td>';
+        });
+        html += '</tr>';
+
+        // STATUS row (Admin completion toggle)
+        html += '<tr class="row-status">';
+        html += '<td class="label-cell">📌 STATUS</td>';
+        br.slots.forEach(slot => {
+          html += '<td class="time-cell status-cell">';
+          html += `<button type="button" class="status-btn ${slot.isCompleted ? 'completed' : 'pending'}" `;
+          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" `;
+          html += `title="Klik untuk menandai break ${this._escHtml(slot.staffName)} ${slot.isCompleted ? 'belum selesai' : 'sudah selesai'}">`;
+          html += slot.isCompleted ? '✅ Selesai' : '⌛ Belum';
+          html += '</button></td>';
         });
         html += '</tr>';
       });
@@ -1515,8 +1611,8 @@
           if (confirm('Apakah Anda yakin ingin mengembalikan seluruh jadwal hari ini ke default?')) {
             BreakOverrideManager.resetAll(State.scheduleDate);
             BreakChoiceManager.resetAll(State.scheduleDate);
+            BreakStatusManager.resetAll(State.scheduleDate);
             this.refreshSchedule();
-            showToast('Seluruh jadwal break berhasil dikembalikan ke default! 🔄', 'success');
           }
         });
       }
@@ -1524,13 +1620,22 @@
       const wrapper = document.getElementById('scheduleTableWrapper');
       if (wrapper) {
         wrapper.addEventListener('click', (e) => {
+          const statusBtn = e.target.closest('.status-btn');
+          if (statusBtn) {
+            const staffId = statusBtn.dataset.staffId;
+            const roundNumber = parseInt(statusBtn.dataset.round, 10);
+            BreakStatusManager.toggleStatus(State.scheduleDate, staffId, roundNumber);
+            this.refreshSchedule();
+            return;
+          }
+
           const resetBtn = e.target.closest('.btn-reset-round');
           if (resetBtn) {
             const roundNumber = parseInt(resetBtn.dataset.round, 10);
             BreakOverrideManager.resetRound(State.scheduleDate, roundNumber);
             BreakChoiceManager.resetRound(State.scheduleDate, roundNumber);
+            BreakStatusManager.resetRound(State.scheduleDate, roundNumber);
             this.refreshSchedule();
-            showToast(`Break ${roundNumber} berhasil dikembalikan ke default! 🔄`, 'success');
           }
         });
         const handleTimeInput = (input, setSelfFocus = true) => {
