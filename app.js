@@ -125,14 +125,23 @@
     },
 
     getSupabaseConfig() {
-      const url = Storage.get('break_scheduler_supabase_url', '');
-      const key = Storage.get('break_scheduler_supabase_key', '');
+      const defaultUrl = 'https://cqqkcpplevyibhniszud.supabase.co';
+      const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxcWtjcHBsZXZ5aWJobmlzenVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDI1NTMsImV4cCI6MjA4OTk3ODU1M30.sJsCdap7tU5_luz0dBxzCzULKbPGFdAecS8ukVKms8A';
+
+      let url = Storage.get('break_scheduler_supabase_url', defaultUrl);
+      let key = Storage.get('break_scheduler_supabase_key', defaultKey);
+
+      if (url) {
+        url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+      }
+
       return { url, key, isConfigured: Boolean(url && key) };
     },
 
     setSupabaseConfig(url, key) {
-      Storage.set('break_scheduler_supabase_url', url);
-      Storage.set('break_scheduler_supabase_key', key);
+      const cleanUrl = url ? url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '') : '';
+      Storage.set('break_scheduler_supabase_url', cleanUrl);
+      Storage.set('break_scheduler_supabase_key', key ? key.trim() : '');
     },
 
     getEndpoint() {
