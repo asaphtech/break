@@ -591,8 +591,37 @@
       return next;
     },
 
+    getBaseDate() {
+      const saved = Storage.get('break_scheduler_base_date', '2026-07-23');
+      return new Date(saved + 'T00:00:00');
+    },
+
+    setBaseDate(dateStr) {
+      Storage.set('break_scheduler_base_date', dateStr);
+    },
+
     getActiveStaffForDate(date) {
-      return StaffManager.getAll().filter(s => this.getStatus(s.id, date) === 'masuk');
+      const masterStaff = StaffManager.getAll();
+      if (masterStaff.length === 0) return [];
+
+      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const base = this.getBaseDate();
+      const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+
+      const diffTime = target.getTime() - baseDay.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+
+      const N = masterStaff.length;
+      let offset = diffDays % N;
+      if (offset < 0) offset = (offset % N + N) % N;
+
+      // Rotate master list: 1st staff moves to back tomorrow, 2nd becomes 1st, etc.
+      const rotatedStaff = [
+        ...masterStaff.slice(offset),
+        ...masterStaff.slice(0, offset)
+      ];
+
+      return rotatedStaff.filter(s => this.getStatus(s.id, target) === 'masuk');
     },
 
     getMonthSummary(year, month) {
@@ -810,6 +839,7 @@
 
       let html = '';
       html += `<p>Total CS yang bertugas hari ini adalah <strong>${N} orang</strong>. Mohon kerjasamanya untuk mematuhi tabel jadwal di atas demi kenyamanan bersama.</p>`;
+      html += `<p>🔄 <strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
       html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong>.</p>`;
       html += `<p>Jadwal break berjalan berurutan dan baru berhenti hingga CS ke istirahat terakhir selesai pukul <strong>${endTime} WIB</strong>.</p>`;
 
