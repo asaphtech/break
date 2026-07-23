@@ -1608,11 +1608,8 @@
                   type: nextEl.dataset.type || 'select'
                 };
 
-                if (currentInput.classList.contains('time-input')) {
-                  handleTimeInput(currentInput, false);
-                } else {
-                  this.refreshSchedule();
-                }
+                nextEl.focus();
+                if (typeof nextEl.select === 'function') nextEl.select();
               }
             }
           }
