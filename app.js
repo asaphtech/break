@@ -1133,8 +1133,8 @@
       schedule.breaks.forEach(br => {
         // Break group header
         html += `<tr class="break-header-row"><td colspan="${N + 1}" class="break-header-cell">`;
-        html += `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;">`;
-        html += `<div>`;
+        html += `<div class="break-header-content">`;
+        html += `<div class="break-header-info">`;
         html += `<span class="break-label">Break ${br.roundNumber}</span>`;
         html += `<span class="break-duration-badge">Default: ${formatDuration(br.defaultDuration)}</span>`;
         html += `</div>`;
