@@ -1446,34 +1446,27 @@
         });
         html += '</tr>';
 
-        // STATUS row (Admin completion toggle)
+        // STATUS row (Admin completion toggle & inline diff tag)
         html += '<tr class="row-status">';
         html += '<td class="label-cell">📌 STATUS</td>';
         br.slots.forEach(slot => {
+          const diff = slot.actualDuration - slot.chosenDuration;
+          let diffTag = '';
+          if (diff > 0) {
+            diffTag = `<span class="diff-tag slower" title="Lebih lama ${formatDuration(diff)} dari target">⚠️ +${formatDuration(diff)}</span>`;
+          } else if (diff < 0) {
+            diffTag = `<span class="diff-tag faster" title="Lebih cepat ${formatDuration(Math.abs(diff))} dari target">⚡ -${formatDuration(Math.abs(diff))}</span>`;
+          }
+
           html += '<td class="time-cell status-cell">';
+          html += '<div class="status-cell-wrapper">';
           html += `<button type="button" class="status-btn ${slot.isCompleted ? 'completed' : 'pending'}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" `;
           html += `title="Klik untuk menandai break ${this._escHtml(slot.staffName)} ${slot.isCompleted ? 'belum selesai' : 'sudah selesai'}">`;
           html += slot.isCompleted ? '✅ Selesai' : '⌛ Belum';
-          html += '</button></td>';
-        });
-        html += '</tr>';
-
-        // SELISIH WAKTU row (Comparison per staff)
-        html += '<tr class="row-diff">';
-        html += '<td class="label-cell">📊 REALISASI CS</td>';
-        br.slots.forEach(slot => {
-          const diff = slot.actualDuration - slot.chosenDuration;
-          let diffClass = 'diff-exact';
-          let label = '🎯 Sesuai';
-          if (diff > 0) {
-            diffClass = 'diff-slower';
-            label = `⚠️ +${formatDuration(diff)}`;
-          } else if (diff < 0) {
-            diffClass = 'diff-faster';
-            label = `⚡ -${formatDuration(Math.abs(diff))}`;
-          }
-          html += `<td class="time-cell ${diffClass}" title="Target: ${formatDuration(slot.chosenDuration)} | Realisasi: ${formatDuration(slot.actualDuration)}">${label}</td>`;
+          html += '</button>';
+          if (diffTag) html += diffTag;
+          html += '</div></td>';
         });
         html += '</tr>';
       });

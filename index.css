@@ -1096,11 +1096,77 @@ body::before {
   box-shadow: 0 0 14px rgba(52, 211, 153, 0.6);
 }
 
+/* Compact Table Padding for Slim Aesthetic Layout */
+.schedule-table thead th {
+  padding: 8px 6px;
+  font-size: 0.85rem;
+}
+
+.break-header-row td {
+  padding: 4px 10px;
+}
+
+.schedule-table .label-cell {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.schedule-table .time-cell {
+  padding: 3px 4px !important;
+  font-size: 0.82rem;
+}
+
+.time-input {
+  padding: 2px 4px;
+  font-size: 0.82rem;
+  max-width: 90px;
+}
+
+.duration-select {
+  padding: 2px 4px;
+  font-size: 0.82rem;
+  max-width: 90px;
+}
+
+/* Status cell wrapper & inline diff tags */
+.status-cell-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.status-btn {
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
+.diff-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.diff-tag.slower {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.diff-tag.faster {
+  background: rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
 /* Block status badges in break headers */
 .block-status-badge {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 3px 12px;
+  padding: 2px 10px;
   border-radius: 20px;
   letter-spacing: 0.03em;
   display: inline-flex;
@@ -1120,14 +1186,12 @@ body::before {
   background: rgba(239, 68, 68, 0.22);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.5);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
 .block-status-badge.block-status-faster {
   background: rgba(56, 189, 248, 0.2);
   color: #7dd3fc;
   border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
 /* REALISASI CS Row Styling */
