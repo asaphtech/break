@@ -221,7 +221,7 @@
             return;
           }
 
-          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.password || '');
+          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.breakStatuses || {}) + JSON.stringify(data.password || '');
           if (hash !== this._lastHash) {
             this._lastHash = hash;
 
@@ -236,6 +236,9 @@
             }
             if (data.breakOverrides) {
               Object.keys(data.breakOverrides).forEach(k => Storage.set(k, data.breakOverrides[k]));
+            }
+            if (data.breakStatuses) {
+              Object.keys(data.breakStatuses).forEach(k => Storage.set(k, data.breakStatuses[k]));
             }
             if (data.password) Storage.set('break_scheduler_pass', data.password);
 
@@ -274,6 +277,7 @@
         const attendance = {};
         const breakChoices = {};
         const breakOverrides = {};
+        const breakStatuses = {};
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('break_att_')) {
@@ -285,6 +289,9 @@
           if (key && key.startsWith('break_override_')) {
             breakOverrides[key] = Storage.get(key, {});
           }
+          if (key && key.startsWith('break_status_')) {
+            breakStatuses[key] = Storage.get(key, {});
+          }
         }
 
         const payload = {
@@ -293,10 +300,11 @@
           attendance,
           breakChoices,
           breakOverrides,
+          breakStatuses,
           password
         };
 
-        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides) + JSON.stringify(password || '');
+        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides) + JSON.stringify(breakStatuses) + JSON.stringify(password || '');
 
         let res;
         if (isSupa) {
