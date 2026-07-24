@@ -224,24 +224,7 @@
           const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.breakStatuses || {}) + JSON.stringify(data.password || '');
           if (hash !== this._lastHash) {
             this._lastHash = hash;
-
-            if (data.staff && data.staff.length > 0) {
-              Storage.setStaff(data.staff);
-            }
-            if (data.attendance) {
-              Object.keys(data.attendance).forEach(k => Storage.set(k, data.attendance[k]));
-            }
-            if (data.breakChoices) {
-              Object.keys(data.breakChoices).forEach(k => Storage.set(k, data.breakChoices[k]));
-            }
-            if (data.breakOverrides) {
-              Object.keys(data.breakOverrides).forEach(k => Storage.set(k, data.breakOverrides[k]));
-            }
-            if (data.breakStatuses) {
-              Object.keys(data.breakStatuses).forEach(k => Storage.set(k, data.breakStatuses[k]));
-            }
-            if (data.password) Storage.set('break_scheduler_pass', data.password);
-
+            this._mergeState(data);
             StaffManager.init();
             if (!isInitial) {
               App.refreshAll();
@@ -252,6 +235,67 @@
       } catch (err) {
         console.warn('CloudSync pull error:', err);
         this.updateBadge('offline', 'Local Mode');
+      }
+    },
+
+    _mergeState(cloudData) {
+      if (!cloudData || typeof cloudData !== 'object') return;
+
+      const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
+      const cloudUpdatedAt = cloudData.updatedAt || '';
+
+      if (Array.isArray(cloudData.staff) && cloudData.staff.length > 0) {
+        const localStaff = Storage.getStaff();
+        if (!localStaff || localStaff.length === 0 || !localUpdatedAt || new Date(cloudUpdatedAt) >= new Date(localUpdatedAt)) {
+          Storage.setStaff(cloudData.staff);
+        }
+      }
+
+      if (cloudData.password) {
+        Storage.set('break_scheduler_pass', cloudData.password);
+      }
+
+      const categories = [
+        { key: 'attendance', prefix: 'break_att_' },
+        { key: 'breakChoices', prefix: 'break_choice_' },
+        { key: 'breakOverrides', prefix: 'break_override_' },
+        { key: 'breakStatuses', prefix: 'break_status_' }
+      ];
+
+      let hasLocalUnpushedData = false;
+
+      categories.forEach(cat => {
+        const cloudDict = cloudData[cat.key] || {};
+        
+        Object.keys(cloudDict).forEach(k => {
+          if (k.startsWith(cat.prefix)) {
+            const localVal = Storage.get(k, null);
+            const cloudVal = cloudDict[k];
+
+            if (!localVal) {
+              Storage.set(k, cloudVal);
+            } else {
+              const merged = Object.assign({}, cloudVal, localVal);
+              Storage.set(k, merged);
+            }
+          }
+        });
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const lKey = localStorage.key(i);
+          if (lKey && lKey.startsWith(cat.prefix)) {
+            if (!cloudDict[lKey] || Object.keys(cloudDict[lKey]).length === 0) {
+              const localVal = Storage.get(lKey, {});
+              if (Object.keys(localVal).length > 0) {
+                hasLocalUnpushedData = true;
+              }
+            }
+          }
+        }
+      });
+
+      if (hasLocalUnpushedData) {
+        setTimeout(() => this.pushData(), 500);
       }
     },
 
