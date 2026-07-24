@@ -1685,12 +1685,14 @@
       const resetAllBtn = document.getElementById('resetAllBtn');
       if (resetAllBtn) {
         resetAllBtn.addEventListener('click', () => {
-          if (confirm('Apakah Anda yakin ingin mengembalikan seluruh jadwal hari ini ke default?')) {
-            BreakOverrideManager.resetAll(State.scheduleDate);
-            BreakChoiceManager.resetAll(State.scheduleDate);
-            BreakStatusManager.resetAll(State.scheduleDate);
-            this.refreshSchedule();
-          }
+          AuthManager.requireAuth(() => {
+            if (confirm('Apakah Anda yakin ingin mengembalikan seluruh jadwal hari ini ke default?')) {
+              BreakOverrideManager.resetAll(State.scheduleDate);
+              BreakChoiceManager.resetAll(State.scheduleDate);
+              BreakStatusManager.resetAll(State.scheduleDate);
+              this.refreshSchedule();
+            }
+          });
         });
       }
 
@@ -1708,11 +1710,15 @@
 
           const resetBtn = e.target.closest('.btn-reset-round');
           if (resetBtn) {
-            const roundNumber = parseInt(resetBtn.dataset.round, 10);
-            BreakOverrideManager.resetRound(State.scheduleDate, roundNumber);
-            BreakChoiceManager.resetRound(State.scheduleDate, roundNumber);
-            BreakStatusManager.resetRound(State.scheduleDate, roundNumber);
-            this.refreshSchedule();
+            AuthManager.requireAuth(() => {
+              const roundNumber = parseInt(resetBtn.dataset.round, 10);
+              if (confirm(`Apakah Anda yakin ingin mengembalikan jadwal Break ${roundNumber} ke default?`)) {
+                BreakOverrideManager.resetRound(State.scheduleDate, roundNumber);
+                BreakChoiceManager.resetRound(State.scheduleDate, roundNumber);
+                BreakStatusManager.resetRound(State.scheduleDate, roundNumber);
+                this.refreshSchedule();
+              }
+            });
           }
         });
         const handleTimeInput = (input, setSelfFocus = true) => {
