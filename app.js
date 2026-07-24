@@ -1219,6 +1219,22 @@
           currentPointer = masuk;
         }
 
+        const firstSlot = breakRound.slots[0];
+        const lastSlot = breakRound.slots[N - 1];
+
+        const totalScheduledDuration = breakRound.slots.reduce((sum, s) => sum + s.chosenDuration, 0);
+        const blockStart = firstSlot ? firstSlot.keluar : roundStart;
+        const blockTargetEnd = blockStart + totalScheduledDuration;
+        const blockActualEnd = lastSlot ? lastSlot.masuk : blockTargetEnd;
+        const diffSecs = blockActualEnd - blockTargetEnd;
+
+        breakRound.blockStart = blockStart;
+        breakRound.blockTargetEnd = blockTargetEnd;
+        breakRound.blockActualEnd = blockActualEnd;
+        breakRound.diffSecs = diffSecs;
+        breakRound.totalScheduledDuration = totalScheduledDuration;
+        breakRound.totalActualDuration = blockActualEnd - blockStart;
+
         // Next break round starts when the last staff member of this round finishes!
         roundStart = currentPointer;
         schedule.breaks.push(breakRound);
@@ -1302,6 +1318,50 @@
       }
     },
 
+    _formatDiffSummary(diffSecs, blockTargetEnd, blockActualEnd) {
+      const targetStr = formatTime(blockTargetEnd);
+      const actualStr = formatTime(blockActualEnd);
+
+      if (diffSecs === 0) {
+        return {
+          text: `🎯 Tepat waktu (Selesai ${actualStr})`,
+          badgeClass: 'block-status-exact',
+          targetStr,
+          actualStr
+        };
+      }
+
+      const absDiff = Math.abs(diffSecs);
+      const m = Math.floor(absDiff / 60);
+      const s = absDiff % 60;
+      let diffStr = '';
+      if (m > 0 && s > 0) {
+        diffStr = `${m}m ${s}s`;
+      } else if (m > 0) {
+        diffStr = `${m}m`;
+      } else {
+        diffStr = `${s}s`;
+      }
+
+      if (diffSecs > 0) {
+        return {
+          text: `⚠️ Lebih lama ${diffStr} (Jadwal ${targetStr} ➔ Realisasi ${actualStr})`,
+          badgeClass: 'block-status-slower',
+          targetStr,
+          actualStr,
+          diffStr
+        };
+      } else {
+        return {
+          text: `⚡ Lebih cepat ${diffStr} (Jadwal ${targetStr} ➔ Realisasi ${actualStr})`,
+          badgeClass: 'block-status-faster',
+          targetStr,
+          actualStr,
+          diffStr
+        };
+      }
+    },
+
     _buildTable(schedule) {
       const staff = schedule.staff;
       const N = staff.length;
@@ -1314,12 +1374,15 @@
       html += '</tr></thead><tbody>';
 
       schedule.breaks.forEach(br => {
+        const summary = this._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd);
+
         // Break group header
         html += `<tr class="break-header-row"><td colspan="${N + 1}" class="break-header-cell">`;
         html += `<div class="break-header-content">`;
         html += `<div class="break-header-info">`;
         html += `<span class="break-label">Break ${br.roundNumber}</span>`;
         html += `<span class="break-duration-badge">Default: ${formatDuration(br.defaultDuration)}</span>`;
+        html += `<span class="block-status-badge ${summary.badgeClass}" title="Jadwal Target Selesai: ${summary.targetStr} | Realisasi Selesai: ${summary.actualStr}">${summary.text}</span>`;
         html += `</div>`;
         html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset Break ${br.roundNumber}</button>`;
         html += `</div>`;
@@ -1393,6 +1456,24 @@
           html += `title="Klik untuk menandai break ${this._escHtml(slot.staffName)} ${slot.isCompleted ? 'belum selesai' : 'sudah selesai'}">`;
           html += slot.isCompleted ? '✅ Selesai' : '⌛ Belum';
           html += '</button></td>';
+        });
+        html += '</tr>';
+
+        // SELISIH WAKTU row (Comparison per staff)
+        html += '<tr class="row-diff">';
+        html += '<td class="label-cell">📊 REALISASI CS</td>';
+        br.slots.forEach(slot => {
+          const diff = slot.actualDuration - slot.chosenDuration;
+          let diffClass = 'diff-exact';
+          let label = '🎯 Sesuai';
+          if (diff > 0) {
+            diffClass = 'diff-slower';
+            label = `⚠️ +${formatDuration(diff)}`;
+          } else if (diff < 0) {
+            diffClass = 'diff-faster';
+            label = `⚡ -${formatDuration(Math.abs(diff))}`;
+          }
+          html += `<td class="time-cell ${diffClass}" title="Target: ${formatDuration(slot.chosenDuration)} | Realisasi: ${formatDuration(slot.actualDuration)}">${label}</td>`;
         });
         html += '</tr>';
       });

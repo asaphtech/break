@@ -1096,6 +1096,70 @@ body::before {
   box-shadow: 0 0 14px rgba(52, 211, 153, 0.6);
 }
 
+/* Block status badges in break headers */
+.block-status-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.block-status-badge.block-status-exact {
+  background: rgba(52, 211, 153, 0.18);
+  color: #4ade80;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.block-status-badge.block-status-slower {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.block-status-badge.block-status-faster {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* REALISASI CS Row Styling */
+.row-diff .label-cell {
+  background: #1e1b4b;
+  color: #c084fc;
+  border-left: 4px solid #8b5cf6;
+}
+
+.row-diff .time-cell {
+  background: #0f172a;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 8px !important;
+}
+
+.time-cell.diff-slower {
+  color: #fca5a5 !important;
+  background: rgba(239, 68, 68, 0.18) !important;
+}
+
+.time-cell.diff-faster {
+  color: #7dd3fc !important;
+  background: rgba(56, 189, 248, 0.18) !important;
+}
+
+.time-cell.diff-exact {
+  color: #4ade80 !important;
+  background: rgba(52, 211, 153, 0.12) !important;
+}
+
 /* Reset per-break button */
 .btn-reset-round {
   background: rgba(239, 68, 68, 0.16);
