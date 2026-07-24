@@ -6,7 +6,7 @@
      ============================================ */
   const TOTAL_SECONDS = 37620;        // 08:33:00 → 19:00:00
   const START_SECONDS = 30780;        // 08:33:00 as seconds from midnight
-  const MAX_BREAK_DURATION = 1200;    // 20 minutes in seconds
+  const MAX_BREAK_DURATION = 1260;    // 21 minutes in seconds (20 min break + 1 min tolerance)
   const LC_OFFSET = 180;             // 3 minutes before break
   const MAX_BREAK_COUNT = 4;
 
@@ -1494,11 +1494,11 @@
       let html = '';
       html += `<p>Total CS yang bertugas hari ini adalah <strong>${N} orang</strong>. Mohon kerjasamanya untuk mematuhi tabel jadwal di atas demi kenyamanan bersama.</p>`;
       html += `<p>🔄 <strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
-      html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong>.</p>`;
+      html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong> (sudah termasuk toleransi 1 menit).</p>`;
       html += `<p>Jadwal break berjalan berurutan dan baru berhenti hingga CS ke istirahat terakhir selesai pukul <strong>${endTime} WIB</strong>.</p>`;
 
       if (N <= 7) {
-        html += `<p style="color:var(--green)">✅ Semua break berdurasi penuh 20 menit karena jumlah staff ≤ 7 orang.</p>`;
+        html += `<p style="color:var(--green)">✅ Semua break berdurasi 21 menit (20 menit break + 1 menit toleransi) karena jumlah staff ≤ 7 orang.</p>`;
       }
 
       return html;
