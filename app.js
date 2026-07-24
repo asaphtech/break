@@ -138,6 +138,8 @@
   const CloudSync = {
     _endpoint: 'https://jsonblob.com/api/jsonBlob/019f8d12-4db8-7c04-82f6-a25d87efdf88',
     _syncing: false,
+    _initialPullCompleted: false,
+    _cloudPassword: null,
     _lastHash: '',
     _pollTimer: null,
 
@@ -179,12 +181,15 @@
 
     async pullData(isInitial = false) {
       if (this._syncing) return;
+      this._syncing = true;
 
       const supa = this.getSupabaseConfig();
       const isSupa = supa.isConfigured;
 
       if (!isSupa && window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
+        this._syncing = false;
+        this._initialPullCompleted = true;
         return;
       }
 
@@ -213,11 +218,15 @@
         }
 
         if (data && typeof data === 'object' && Array.isArray(data.staff)) {
+          if (data.password) {
+            this._cloudPassword = data.password;
+          }
+
           const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
           const cloudUpdatedAt = data.updatedAt || '';
 
           if (localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
-            this.pushData();
+            this.pushData(true);
             return;
           }
 
@@ -235,6 +244,9 @@
       } catch (err) {
         console.warn('CloudSync pull error:', err);
         this.updateBadge('offline', 'Local Mode');
+      } finally {
+        this._syncing = false;
+        this._initialPullCompleted = true;
       }
     },
 
@@ -302,7 +314,12 @@
       }
     },
 
-    async pushData() {
+    async pushData(force = false) {
+      if (!this._initialPullCompleted && !force) {
+        console.log('Skipping pushData: initial pull from Cloud is not complete yet.');
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       Storage.set('break_scheduler_updated_at', nowIso);
 
@@ -319,7 +336,11 @@
         this.updateBadge('syncing', 'Menyimpan...');
 
         const staff = StaffManager.getAll();
-        const password = AuthManager.getPassword();
+        let password = AuthManager.getPassword();
+        
+        if (password === '1234' && !Storage.get('break_scheduler_pass_custom', false) && this._cloudPassword) {
+          password = this._cloudPassword;
+        }
         
         const attendance = {};
         const breakChoices = {};
@@ -505,9 +526,10 @@
 
     setPassword(newPass) {
       Storage.set('break_scheduler_pass', newPass);
+      Storage.set('break_scheduler_pass_custom', true);
       Storage.set('break_scheduler_updated_at', new Date().toISOString());
       if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+        CloudSync.pushData(true);
       }
     },
 
