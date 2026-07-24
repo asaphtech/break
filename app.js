@@ -252,7 +252,10 @@
       }
 
       if (cloudData.password) {
-        Storage.set('break_scheduler_pass', cloudData.password);
+        const localPass = Storage.get('break_scheduler_pass', '');
+        if (!localPass || !localUpdatedAt || (cloudUpdatedAt && new Date(cloudUpdatedAt) >= new Date(localUpdatedAt))) {
+          Storage.set('break_scheduler_pass', cloudData.password);
+        }
       }
 
       const categories = [
