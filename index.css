@@ -885,49 +885,49 @@ body::before {
   transition: all var(--transition-fast);
 }
 
-/* MATIKAN LC rows - Merah (Red) 🔴 */
+/* MATIKAN LC rows - Merah Doff (Matte Red) 🔴 */
 .row-matikan .label-cell {
-  background: rgba(239, 68, 68, 0.16);
-  color: #ef4444;
-  border-left: 4px solid #ef4444;
+  background: #450a0a;
+  color: #fca5a5;
+  border-left: 4px solid #dc2626;
 }
 
 .row-matikan .time-cell {
-  background: rgba(239, 68, 68, 0.05);
+  background: #1c0505;
   color: #fca5a5;
-  border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid rgba(220, 38, 38, 0.15);
 }
 
-/* KELUAR rows - Biru (Blue) 🔵 */
+/* KELUAR rows - Biru Doff (Matte Blue) 🔵 */
 .row-keluar .label-cell {
-  background: rgba(59, 130, 246, 0.16);
-  color: #3b82f6;
-  border-left: 4px solid #3b82f6;
+  background: #172554;
+  color: #93c5fd;
+  border-left: 4px solid #2563eb;
 }
 
 .row-keluar .time-cell {
-  background: rgba(59, 130, 246, 0.05);
-  color: #60a5fa;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+  background: #09132b;
+  color: #93c5fd;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.15);
 }
 
-/* DURASI rows - Putih (White) ⚪ */
+/* DURASI rows - Putih Doff (Matte Slate White) ⚪ */
 .row-durasi .label-cell {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-  border-left: 4px solid #ffffff;
+  background: #1e293b;
+  color: #f1f5f9;
+  border-left: 4px solid #94a3b8;
 }
 
 .row-durasi .time-cell {
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0f172a;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
   padding: 6px 8px !important;
 }
 
 .duration-select {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #64748b;
   border-radius: var(--radius-sm);
   padding: 5px 6px;
   font-family: var(--font-mono);
@@ -939,15 +939,15 @@ body::before {
   width: 100%;
   max-width: 100px;
   text-align: center;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+  box-shadow: none;
 }
 
 .duration-select:hover,
 .duration-select:focus {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: #ffffff;
+  background: #475569;
+  border-color: #cbd5e1;
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
+  box-shadow: none;
 }
 
 .duration-select option {
@@ -962,8 +962,8 @@ body::before {
 .duration-select.custom-chosen {
   background: #78350f !important;
   color: #fef08a !important;
-  border-color: #f59e0b !important;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6) !important;
+  border-color: #ca8a04 !important;
+  box-shadow: none !important;
 }
 
 .duration-select.custom-chosen option {
@@ -971,11 +971,11 @@ body::before {
   color: #fde047 !important;
 }
 
-/* Editable time inputs - Biru (Blue) for KELUAR */
+/* Editable time inputs - Biru Doff (Matte Blue) for KELUAR */
 .time-input {
-  background: rgba(15, 25, 45, 0.95);
-  color: #60a5fa;
-  border: 1.5px solid rgba(59, 130, 246, 0.5);
+  background: #1e3a8a;
+  color: #dbeafe;
+  border: 1px solid #2563eb;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
   font-family: var(--font-mono);
@@ -987,31 +987,31 @@ body::before {
   width: 100%;
   max-width: 105px;
   text-align: center;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+  box-shadow: none;
 }
 
 .time-input:hover,
 .time-input:focus {
-  background: #0f172a;
-  border-color: #3b82f6;
+  background: #1e40af;
+  border-color: #60a5fa;
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.6);
+  box-shadow: none;
 }
 
-/* Editable time inputs - Kuning (Yellow) for MASUK */
+/* Editable time inputs - Kuning Doff (Matte Gold Yellow) for MASUK */
 .time-input.masuk-input {
-  background: rgba(30, 24, 12, 0.95);
-  color: #fde047;
-  border-color: rgba(234, 179, 8, 0.5);
-  box-shadow: 0 0 10px rgba(234, 179, 8, 0.25);
+  background: #713f12;
+  color: #fef9c3;
+  border-color: #ca8a04;
+  box-shadow: none;
 }
 
 .time-input.masuk-input:hover,
 .time-input.masuk-input:focus {
-  background: #18140c;
-  border-color: #eab308;
+  background: #854d0e;
+  border-color: #fde047;
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(234, 179, 8, 0.6);
+  box-shadow: none;
 }
 
 .time-input.is-override {
