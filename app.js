@@ -222,14 +222,6 @@
             this._cloudPassword = data.password;
           }
 
-          const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
-          const cloudUpdatedAt = data.updatedAt || '';
-
-          if (localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
-            this.pushData(true);
-            return;
-          }
-
           const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.breakStatuses || {}) + JSON.stringify(data.password || '');
           if (hash !== this._lastHash) {
             this._lastHash = hash;
@@ -248,6 +240,21 @@
         this._syncing = false;
         this._initialPullCompleted = true;
       }
+    },
+
+    _deepMerge(target, source) {
+      if (!target || typeof target !== 'object') return source ? JSON.parse(JSON.stringify(source)) : {};
+      if (!source || typeof source !== 'object') return target ? JSON.parse(JSON.stringify(target)) : {};
+
+      const output = Object.assign({}, target);
+      Object.keys(source).forEach(key => {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+          output[key] = this._deepMerge(target[key], source[key]);
+        } else {
+          output[key] = source[key];
+        }
+      });
+      return output;
     },
 
     _mergeState(cloudData) {
@@ -277,8 +284,6 @@
         { key: 'breakStatuses', prefix: 'break_status_' }
       ];
 
-      let hasLocalUnpushedData = false;
-
       categories.forEach(cat => {
         const cloudDict = cloudData[cat.key] || {};
         
@@ -290,28 +295,12 @@
             if (!localVal) {
               Storage.set(k, cloudVal);
             } else {
-              const merged = Object.assign({}, cloudVal, localVal);
+              const merged = this._deepMerge(localVal, cloudVal);
               Storage.set(k, merged);
             }
           }
         });
-
-        for (let i = 0; i < localStorage.length; i++) {
-          const lKey = localStorage.key(i);
-          if (lKey && lKey.startsWith(cat.prefix)) {
-            if (!cloudDict[lKey] || Object.keys(cloudDict[lKey]).length === 0) {
-              const localVal = Storage.get(lKey, {});
-              if (Object.keys(localVal).length > 0) {
-                hasLocalUnpushedData = true;
-              }
-            }
-          }
-        }
       });
-
-      if (hasLocalUnpushedData) {
-        setTimeout(() => this.pushData(), 500);
-      }
     },
 
     async pushData(force = false) {
@@ -418,7 +407,7 @@
       if (this._pollTimer) clearInterval(this._pollTimer);
       this._pollTimer = setInterval(() => {
         this.pullData(false);
-      }, 10000);
+      }, 3000);
     },
 
     _setupModalListeners() {
@@ -833,8 +822,9 @@
       if (!data[staffId]) data[staffId] = {};
       data[staffId][d.getDate()] = status;
       Storage.setAttendance(d.getFullYear(), d.getMonth(), data);
+      App.refreshAll();
       if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+        CloudSync.pushData(true);
       }
     },
 
