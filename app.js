@@ -4,8 +4,8 @@
   /* ============================================
      Constants
      ============================================ */
-  const TOTAL_SECONDS = 37620;        // 08:33:00 → 19:00:00
-  const START_SECONDS = 30780;        // 08:33:00 as seconds from midnight
+  const TOTAL_SECONDS = 38400;        // 08:20:00 → 19:00:00
+  const START_SECONDS = 30000;        // 08:20:00 as seconds from midnight
   const MAX_BREAK_DURATION = 1260;    // 21 minutes in seconds (20 min break + 1 min tolerance)
   const LC_OFFSET = 180;             // 3 minutes before break
   const MAX_BREAK_COUNT = 4;
@@ -1153,6 +1153,11 @@
 
       let roundStart = START_SECONDS;
 
+      const usedDurationsByStaff = {};
+      activeStaff.forEach(s => {
+        usedDurationsByStaff[s.id] = new Set();
+      });
+
       for (let r = 0; r < MAX_BREAK_COUNT; r++) {
         const defaultDuration = defaultDurations[r];
         const breakRound = {
@@ -1165,12 +1170,29 @@
 
         for (let i = 0; i < N; i++) {
           const staff = activeStaff[i];
-          const chosenDuration = BreakChoiceManager.getStaffChoice(
+          const staffUsed = usedDurationsByStaff[staff.id];
+
+          const savedChoice = BreakChoiceManager.getStaffChoice(
             targetDate,
             staff.id,
             r + 1,
-            defaultDuration
+            null
           );
+
+          let chosenDuration = savedChoice;
+
+          if (savedChoice !== null && !staffUsed.has(savedChoice)) {
+            chosenDuration = savedChoice;
+          } else {
+            const availableDur = defaultDurations.find(d => !staffUsed.has(d));
+            if (availableDur !== undefined) {
+              chosenDuration = availableDur;
+            } else {
+              chosenDuration = defaultDuration;
+            }
+          }
+
+          staffUsed.add(chosenDuration);
 
           const override = BreakOverrideManager.getStaffOverride(
             targetDate,
@@ -1389,50 +1411,36 @@
       html += '<th class="break-col">BREAK</th>';
       html += '<th class="label-col">ROW</th>';
       staff.forEach(s => {
-        const isPinned = State.activeCauseStaffId === s.id;
-        const causeRounds = schedule.breaks.filter(b => b.bottlenecks && b.bottlenecks.some(bn => bn.staffId === s.id));
-
-        let popoverTitle = '✅ Tepat Waktu';
-        let popoverBody = 'Tidak membuat keterlambatan pada break hari ini.';
-        let popoverClass = 'clean';
-
-        if (causeRounds.length > 0) {
-          popoverTitle = '🔴 CS Penyebab Delay';
-          popoverClass = 'has-delay';
-          const details = causeRounds.map(b => {
-            const bn = b.bottlenecks.find(x => x.staffId === s.id);
-            return `Break ${b.roundNumber} (+${formatDuration(bn.delaySecs)})`;
-          }).join(', ');
-          popoverBody = `Membawa keterlambatan pada: <strong>${details}</strong>`;
-        }
-
-        const pinHint = isPinned ? '📌 Terkunci (Klik untuk unpin)' : '💡 Klik untuk kunci';
-
-        html += `<th class="staff-col clickable-staff ${isPinned ? 'active-cause-staff is-pinned' : ''}" data-staff-id="${s.id}">`;
-        html += `<div class="staff-header-content">`;
-        html += `<span class="staff-name-text">${this._escHtml(s.name)}</span>`;
-        html += `<div class="staff-delay-popover ${popoverClass}">`;
-        html += `<div class="popover-header"><span class="popover-badge">${popoverTitle}</span></div>`;
-        html += `<div class="popover-body">${popoverBody}</div>`;
-        html += `<div class="popover-footer">${pinHint}</div>`;
-        html += `</div>`;
-        html += `</div>`;
-        html += `</th>`;
+        html += `<th class="staff-col" data-staff-id="${s.id}">${this._escHtml(s.name)}</th>`;
       });
       html += '<th class="status-col">STATUS</th>';
       html += '</tr></thead><tbody>';
 
+      const now = new Date();
+      const isToday = toDateString(schedule.date || State.scheduleDate) === toDateString(now);
+      const nowSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
       schedule.breaks.forEach(br => {
+        const firstSlot = br.slots[0];
         const lastSlot = br.slots[br.slots.length - 1];
+        const blockStart = firstSlot ? firstSlot.keluar : 0;
+        const blockEnd = lastSlot ? lastSlot.masuk : 0;
+
+        const isActiveBlock = isToday && (nowSecs >= blockStart && nowSecs <= blockEnd);
+        const activeClass = isActiveBlock ? 'active-break-block' : '';
+
         const lastStaffName = lastSlot ? lastSlot.staffName : '';
         const summary = this._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd, br.bottlenecks, lastStaffName);
 
         // 1. DURASI row (with rowspan=4 for BREAK and STATUS cells)
-        html += '<tr class="row-durasi">';
-        html += `<td rowspan="4" class="break-block-cell">`;
+        html += `<tr class="row-durasi ${activeClass}">`;
+        html += `<td rowspan="4" class="break-block-cell ${activeClass}">`;
         html += `<div class="break-block-info">`;
         html += `<div class="break-block-title">BREAK ${br.roundNumber}</div>`;
         html += `<div class="break-block-default">Default: ${formatDuration(br.defaultDuration)}</div>`;
+        if (isActiveBlock) {
+          html += `<div class="live-block-badge">⚡ SEDANG BERJALAN</div>`;
+        }
         html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset</button>`;
         html += `</div></td>`;
         html += '<td class="label-cell">⏱️ DURASI</td>';
@@ -1443,6 +1451,17 @@
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" `;
           html += `title="Pilih opsi durasi break untuk ${this._escHtml(slot.staffName)}">`;
 
+          // Collect durations already selected by this staff member in other break rounds
+          const usedDurationsInOtherRounds = new Set();
+          schedule.breaks.forEach(otherBr => {
+            if (otherBr.roundNumber !== br.roundNumber) {
+              const otherSlot = otherBr.slots.find(s => s.staffId === slot.staffId);
+              if (otherSlot) {
+                usedDurationsInOtherRounds.add(otherSlot.chosenDuration);
+              }
+            }
+          });
+
           schedule.durations.forEach(durSec => {
             const isSelected = slot.chosenDuration === durSec;
             html += `<option value="${durSec}" ${isSelected ? 'selected' : ''}>${formatDuration(durSec)}</option>`;
@@ -1451,13 +1470,13 @@
           html += '</select></td>';
         });
 
-        html += `<td rowspan="4" class="block-status-cell">`;
+        html += `<td rowspan="4" class="block-status-cell ${activeClass}">`;
         html += `<span class="block-status-badge ${summary.badgeClass}" title="Jadwal Target Selesai: ${summary.targetStr} | Realisasi Selesai: ${summary.actualStr}">${summary.text}</span>`;
         html += `</td>`;
         html += '</tr>';
 
         // 2. MATIKAN LC row
-        html += '<tr class="row-matikan">';
+        html += `<tr class="row-matikan ${activeClass}">`;
         html += '<td class="label-cell">🔴 MATIKAN LC</td>';
         br.slots.forEach(slot => {
           html += `<td class="time-cell matikan-cell">${formatTime(slot.matikanLC)}</td>`;
@@ -1465,7 +1484,7 @@
         html += '</tr>';
 
         // 3. KELUAR row
-        html += '<tr class="row-keluar">';
+        html += `<tr class="row-keluar ${activeClass}">`;
         html += '<td class="label-cell">🚶 KELUAR</td>';
         br.slots.forEach(slot => {
           html += '<td class="time-cell keluar-cell">';
@@ -1477,18 +1496,29 @@
         html += '</tr>';
 
         // 4. MASUK row
-        html += '<tr class="row-masuk">';
+        html += `<tr class="row-masuk ${activeClass}">`;
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
           let inputClass = 'time-input masuk-input';
           if (slot.isExceeded) inputClass += ' is-exceeded';
           else if (slot.isMasukOverride) inputClass += ' is-override';
 
-          const titleMsg = slot.isExceeded
-            ? `⚠️ Durasi break ${this._escHtml(slot.staffName)} melebihi ${formatDuration(slot.chosenDuration)}!`
-            : `Klik atau paste jam masuk ${this._escHtml(slot.staffName)}`;
+          // Calculate actual elapsed duration (from KELUAR to MASUK)
+          const actualSecs = Math.max(0, slot.actualDuration || (slot.masuk - slot.keluar));
+          const m = Math.floor(actualSecs / 60);
+          const s = actualSecs % 60;
+          let actualDurStr = '';
+          if (m > 0 && s > 0) actualDurStr = `${m}m ${s}s`;
+          else if (m > 0) actualDurStr = `${m}m`;
+          else actualDurStr = `${s}s`;
 
-          html += '<td class="time-cell masuk-cell">';
+          const durTargetStr = formatDuration(slot.chosenDuration);
+
+          const titleMsg = slot.isExceeded
+            ? `⚠️ CS ${this._escHtml(slot.staffName)}: Terpakai ${actualDurStr} (Target: ${durTargetStr}) - Melebihi target!`
+            : `CS ${this._escHtml(slot.staffName)} | Durasi Terpakai: ${actualDurStr} (Target: ${durTargetStr})`;
+
+          html += `<td class="time-cell masuk-cell" data-duration="⏱️ ${actualDurStr}" title="${titleMsg}">`;
           html += `<input type="text" maxlength="8" class="${inputClass}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
           html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="${titleMsg}">`;
@@ -1524,17 +1554,31 @@
         let cellClass = 'summary-exact';
 
         if (netSecs > 0) {
-          label = `⚠️ Slower ${timeStr}`;
+          label = `<span class="sum-icon">⚠️</span><span class="sum-time">Slower ${timeStr}</span>`;
           cellClass = 'summary-slower';
         } else if (netSecs < 0) {
-          label = `⚡ Faster ${timeStr}`;
+          label = `<span class="sum-icon">⚡</span><span class="sum-time">Faster ${timeStr}</span>`;
           cellClass = 'summary-faster';
         }
 
         html += `<td class="time-cell ${cellClass}" title="Total Target: ${formatDuration(totalChosen)} | Total Realisasi: ${formatDuration(totalActual)}">${label}</td>`;
       });
 
-      html += '<td class="summary-empty-cell"></td>';
+      // Calculate overall On Time vs Delay percentage across all break blocks
+      const totalBlocks = schedule.breaks.length;
+      const delayedBlocks = schedule.breaks.filter(b => b.diffSecs > 0).length;
+      const onTimeBlocks = totalBlocks - delayedBlocks;
+      const blockOnTimePercent = Math.round((onTimeBlocks / totalBlocks) * 100);
+      const blockDelayPercent = 100 - blockOnTimePercent;
+
+      let onTimeBadgeHtml = '';
+      if (blockDelayPercent === 0) {
+        onTimeBadgeHtml = `<div class="accuracy-badge is-ontime" title="Ketepatan waktu jadwal hari ini: 100% On Time">🎯 100% On Time</div>`;
+      } else {
+        onTimeBadgeHtml = `<div class="accuracy-badge is-delay" title="Ketepatan waktu: ${blockOnTimePercent}% On Time | ${blockDelayPercent}% Delay">⚠️ ${blockOnTimePercent}% On Time<span class="delay-subtext">${blockDelayPercent}% Delay</span></div>`;
+      }
+
+      html += `<td class="summary-empty-cell summary-accuracy-cell">${onTimeBadgeHtml}</td>`;
       html += '</tr>';
 
       html += '</tbody></table>';
@@ -1981,8 +2025,33 @@
             const staffId = select.dataset.staffId;
             const roundNumber = parseInt(select.dataset.round, 10);
             const durationSeconds = parseInt(select.value, 10);
+            const targetDate = State.scheduleDate;
 
-            BreakChoiceManager.setChoice(State.scheduleDate, staffId, roundNumber, durationSeconds);
+            // Check if another round currently has durationSeconds for this staff member
+            const activeStaff = AttendanceManager.getActiveStaffForDate(targetDate);
+            const currentSchedule = BreakCalculator.generateSchedule(activeStaff, targetDate);
+
+            if (currentSchedule) {
+              let oldDurationOfTarget = durationSeconds;
+              let roundToSwap = null;
+
+              currentSchedule.breaks.forEach(br => {
+                const slot = br.slots.find(s => s.staffId === staffId);
+                if (slot) {
+                  if (br.roundNumber === roundNumber) {
+                    oldDurationOfTarget = slot.chosenDuration;
+                  } else if (slot.chosenDuration === durationSeconds) {
+                    roundToSwap = br.roundNumber;
+                  }
+                }
+              });
+
+              if (roundToSwap) {
+                BreakChoiceManager.setChoice(targetDate, staffId, roundToSwap, oldDurationOfTarget);
+              }
+            }
+
+            BreakChoiceManager.setChoice(targetDate, staffId, roundNumber, durationSeconds);
             this.refreshSchedule();
             return;
           }
