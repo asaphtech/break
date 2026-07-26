@@ -1663,6 +1663,65 @@
       ScheduleRenderer.render();
     },
 
+    copyScheduleToSheet() {
+      const activeStaff = AttendanceManager.getActiveStaffForDate(State.scheduleDate);
+      if (activeStaff.length === 0) {
+        showToast('Tidak ada staff aktif untuk disalin', 'error');
+        return;
+      }
+
+      const schedule = BreakCalculator.generateSchedule(activeStaff, State.scheduleDate);
+      if (!schedule || !schedule.breaks || schedule.breaks.length === 0) {
+        showToast('Jadwal tidak tersedia', 'error');
+        return;
+      }
+
+      const dateStr = formatDateID(State.scheduleDate);
+      const staffNames = schedule.staff.map(s => s.name);
+
+      let tsv = `JADWAL BREAK STAFF — ${dateStr}\n`;
+      tsv += 'BREAK / ROW\t' + staffNames.join('\t') + '\n\n';
+
+      schedule.breaks.forEach(br => {
+        const summary = ScheduleRenderer._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd);
+
+        tsv += `Break ${br.roundNumber} (${summary.text})\t` + Array(staffNames.length).fill('').join('\t') + '\n';
+        tsv += '🔴 MATIKAN LC\t' + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\n';
+        tsv += '🚶 KELUAR\t' + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\n';
+        tsv += '⏱️ DURASI\t' + br.slots.map(s => formatDuration(s.chosenDuration)).join('\t') + '\n';
+        tsv += '✅ MASUK\t' + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\n';
+        tsv += '📌 STATUS\t' + br.slots.map(s => s.isCompleted ? 'Selesai' : 'Belum').join('\t') + '\n\n';
+      });
+
+      const notifySuccess = () => {
+        showToast('Jadwal berhasil disalin! Tinggal Ctrl+V di Google Sheets / Excel 📊', 'success');
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(tsv).then(notifySuccess).catch(() => {
+          this._fallbackCopyText(tsv, notifySuccess);
+        });
+      } else {
+        this._fallbackCopyText(tsv, notifySuccess);
+      }
+    },
+
+    _fallbackCopyText(text, callback) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        if (callback) callback();
+      } catch {
+        showToast('Gagal menyalin ke clipboard', 'error');
+      }
+      document.body.removeChild(textArea);
+    },
+
     refreshStaff() {
       StaffRenderer.render();
     },
@@ -1745,6 +1804,13 @@
       printBtn.addEventListener('click', () => {
         window.print();
       });
+
+      const copySheetBtn = document.getElementById('copySheetBtn');
+      if (copySheetBtn) {
+        copySheetBtn.addEventListener('click', () => {
+          this.copyScheduleToSheet();
+        });
+      }
 
       const resetAllBtn = document.getElementById('resetAllBtn');
       if (resetAllBtn) {
