@@ -73,11 +73,15 @@
     return h * 3600 + m * 60 + s;
   }
 
-  function formatDuration(seconds) {
+  function formatDuration(seconds, includeHours = false) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.round(seconds % 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+    if (includeHours) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
   function formatDateID(date) {
@@ -1689,7 +1693,7 @@
         tsv += `Break ${br.roundNumber} (${summary.text})\t` + Array(staffNames.length).fill('').join('\t') + '\n';
         tsv += '🔴 MATIKAN LC\t' + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\n';
         tsv += '🚶 KELUAR\t' + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\n';
-        tsv += '⏱️ DURASI\t' + br.slots.map(s => formatDuration(s.chosenDuration)).join('\t') + '\n';
+        tsv += '⏱️ DURASI\t' + br.slots.map(s => formatDuration(s.chosenDuration, true)).join('\t') + '\n';
         tsv += '✅ MASUK\t' + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\n';
         tsv += '📌 STATUS\t' + br.slots.map(s => s.isCompleted ? 'Selesai' : 'Belum').join('\t') + '\n\n';
       });

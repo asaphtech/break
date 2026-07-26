@@ -1119,13 +1119,13 @@ body::before {
 .time-input {
   padding: 2px 4px;
   font-size: 0.82rem;
-  max-width: 98px;
+  max-width: 90px;
 }
 
 .duration-select {
   padding: 2px 4px;
   font-size: 0.82rem;
-  max-width: 98px;
+  max-width: 90px;
 }
 
 /* Status cell wrapper & inline diff tags */
