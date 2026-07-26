@@ -2361,6 +2361,36 @@
           }
         });
       }
+
+      // Duration tooltip on MASUK input hover
+      let _durTooltip = document.getElementById('masuk-dur-tooltip');
+      if (!_durTooltip) {
+        _durTooltip = document.createElement('div');
+        _durTooltip.id = 'masuk-dur-tooltip';
+        document.body.appendChild(_durTooltip);
+      }
+
+      document.addEventListener('mouseover', (e) => {
+        const input = e.target.closest('.masuk-input');
+        if (!input) return;
+        const td = input.closest('.masuk-cell');
+        const dur = td ? td.getAttribute('data-duration') : null;
+        if (!dur) return;
+
+        _durTooltip.textContent = dur;
+        _durTooltip.classList.add('show');
+
+        const rect = input.getBoundingClientRect();
+        const ttRect = _durTooltip.getBoundingClientRect();
+        _durTooltip.style.left = (rect.left + rect.width / 2 - ttRect.width / 2 + window.scrollX) + 'px';
+        _durTooltip.style.top = (rect.top - ttRect.height - 8 + window.scrollY) + 'px';
+      });
+
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('.masuk-input')) {
+          _durTooltip.classList.remove('show');
+        }
+      });
     },
 
     _openEditModal(staffId) {

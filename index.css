@@ -2499,3 +2499,32 @@ tr.active-break-block .time-cell {
     font-size: 1.2rem;
   }
 }
+
+/* ============================================
+   Floating Duration Tooltip (MASUK input hover)
+   ============================================ */
+#masuk-dur-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #0f172a;
+  color: #fde047;
+  border: 1px solid rgba(253, 224, 71, 0.65);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#masuk-dur-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
