@@ -1214,6 +1214,23 @@
           currentPointer = masuk;
         }
 
+        let expectedPointer = roundStart;
+        breakRound.slots.forEach(slot => {
+          const targetKeluar = expectedPointer;
+          const targetMasuk = targetKeluar + slot.chosenDuration;
+          const delaySecs = slot.masuk - targetMasuk;
+
+          slot.targetKeluar = targetKeluar;
+          slot.targetMasuk = targetMasuk;
+          slot.delaySecs = delaySecs;
+          slot.isBottleneck = delaySecs > 0;
+
+          expectedPointer = targetMasuk;
+        });
+
+        const bottlenecks = breakRound.slots.filter(s => s.delaySecs > 0).sort((a, b) => b.delaySecs - a.delaySecs);
+        breakRound.bottlenecks = bottlenecks;
+
         const firstSlot = breakRound.slots[0];
         const lastSlot = breakRound.slots[N - 1];
 
@@ -1249,7 +1266,8 @@
     calMonth: new Date().getMonth(),
     editingStaffId: null,
     deletingStaffId: null,
-    focusTarget: null
+    focusTarget: null,
+    activeCauseStaffId: null
   };
 
   /* ============================================
@@ -1283,8 +1301,8 @@
       if (activeStaff.length === 0) {
         wrapper.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">📭</div>
-            <div class="empty-state-title">Tidak ada staff aktif</div>
+            <div class="empty-state-icon">🏖️</div>
+            <div class="empty-state-title">Tidak Ada Staff Berkeliling/Aktif</div>
             <div class="empty-state-text">Semua staff sedang libur atau cuti pada tanggal ini. Buka tab "Jadwal Kehadiran" untuk mengatur status staff.</div>
           </div>`;
         footer.innerHTML = '';
@@ -1306,20 +1324,26 @@
         const targetEl = wrapper.querySelector(selector);
         if (targetEl) {
           targetEl.focus();
-          if (typeof targetEl.select === 'function') {
+          if (focusTarget.type !== 'select' && targetEl.select) {
             targetEl.select();
           }
         }
       }
+
+      this._attachInputListeners();
     },
 
-    _formatDiffSummary(diffSecs, blockTargetEnd, blockActualEnd) {
+    _buildDelaySummaryCard(schedule) {
+      return '';
+    },
+
+    _formatDiffSummary(diffSecs, blockTargetEnd, blockActualEnd, bottlenecks = [], lastStaffName = '') {
       const targetStr = formatTime(blockTargetEnd);
       const actualStr = formatTime(blockActualEnd);
 
       if (diffSecs === 0) {
         return {
-          text: `🎯 Tepat waktu (Selesai ${actualStr})`,
+          text: `ON TIME`,
           badgeClass: 'block-status-exact',
           targetStr,
           actualStr
@@ -1340,7 +1364,7 @@
 
       if (diffSecs > 0) {
         return {
-          text: `⚠️ Lebih lama ${diffStr} (Jadwal ${targetStr} ➔ Realisasi ${actualStr})`,
+          text: `SLOWER ${diffStr}`,
           badgeClass: 'block-status-slower',
           targetStr,
           actualStr,
@@ -1348,7 +1372,7 @@
         };
       } else {
         return {
-          text: `⚡ Lebih cepat ${diffStr} (Jadwal ${targetStr} ➔ Realisasi ${actualStr})`,
+          text: `FASTER ${diffStr}`,
           badgeClass: 'block-status-faster',
           targetStr,
           actualStr,
@@ -1362,50 +1386,57 @@
       const N = staff.length;
 
       let html = '<table class="schedule-table"><thead><tr>';
-      html += '<th class="label-col">BREAK</th>';
+      html += '<th class="break-col">BREAK</th>';
+      html += '<th class="label-col">ROW</th>';
       staff.forEach(s => {
-        html += `<th class="staff-col">${this._escHtml(s.name)}</th>`;
+        const isPinned = State.activeCauseStaffId === s.id;
+        const causeRounds = schedule.breaks.filter(b => b.bottlenecks && b.bottlenecks.some(bn => bn.staffId === s.id));
+
+        let popoverTitle = '✅ Tepat Waktu';
+        let popoverBody = 'Tidak membuat keterlambatan pada break hari ini.';
+        let popoverClass = 'clean';
+
+        if (causeRounds.length > 0) {
+          popoverTitle = '🔴 CS Penyebab Delay';
+          popoverClass = 'has-delay';
+          const details = causeRounds.map(b => {
+            const bn = b.bottlenecks.find(x => x.staffId === s.id);
+            return `Break ${b.roundNumber} (+${formatDuration(bn.delaySecs)})`;
+          }).join(', ');
+          popoverBody = `Membawa keterlambatan pada: <strong>${details}</strong>`;
+        }
+
+        const pinHint = isPinned ? '📌 Terkunci (Klik untuk unpin)' : '💡 Klik untuk kunci';
+
+        html += `<th class="staff-col clickable-staff ${isPinned ? 'active-cause-staff is-pinned' : ''}" data-staff-id="${s.id}">`;
+        html += `<div class="staff-header-content">`;
+        html += `<span class="staff-name-text">${this._escHtml(s.name)}</span>`;
+        html += `<div class="staff-delay-popover ${popoverClass}">`;
+        html += `<div class="popover-header"><span class="popover-badge">${popoverTitle}</span></div>`;
+        html += `<div class="popover-body">${popoverBody}</div>`;
+        html += `<div class="popover-footer">${pinHint}</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `</th>`;
       });
+      html += '<th class="status-col">STATUS</th>';
       html += '</tr></thead><tbody>';
 
       schedule.breaks.forEach(br => {
-        const summary = this._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd);
+        const lastSlot = br.slots[br.slots.length - 1];
+        const lastStaffName = lastSlot ? lastSlot.staffName : '';
+        const summary = this._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd, br.bottlenecks, lastStaffName);
 
-        // Break group header
-        html += `<tr class="break-header-row"><td colspan="${N + 1}" class="break-header-cell">`;
-        html += `<div class="break-header-content">`;
-        html += `<div class="break-header-info">`;
-        html += `<span class="break-label">Break ${br.roundNumber}</span>`;
-        html += `<span class="break-duration-badge">Default: ${formatDuration(br.defaultDuration)}</span>`;
-        html += `<span class="block-status-badge ${summary.badgeClass}" title="Jadwal Target Selesai: ${summary.targetStr} | Realisasi Selesai: ${summary.actualStr}">${summary.text}</span>`;
-        html += `</div>`;
-        html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset Break ${br.roundNumber}</button>`;
-        html += `</div>`;
-        html += '</td></tr>';
-
-        // MATIKAN LC row
-        html += '<tr class="row-matikan">';
-        html += '<td class="label-cell">🔴 MATIKAN LC</td>';
-        br.slots.forEach(slot => {
-          html += `<td class="time-cell matikan-cell">${formatTime(slot.matikanLC)}</td>`;
-        });
-        html += '</tr>';
-
-        // KELUAR row (Editable Text Input for easy typing & pasting)
-        html += '<tr class="row-keluar">';
-        html += '<td class="label-cell">🚶 KELUAR</td>';
-        br.slots.forEach(slot => {
-          html += '<td class="time-cell keluar-cell">';
-          html += `<input type="text" maxlength="8" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
-          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="keluar" `;
-          html += `value="${formatTime(slot.keluar)}" placeholder="00:00:00" title="Klik atau paste jam keluar ${this._escHtml(slot.staffName)}">`;
-          html += '</td>';
-        });
-        html += '</tr>';
-
-        // DURASI row (Staff Duration Selector)
+        // 1. DURASI row (with rowspan=4 for BREAK and STATUS cells)
         html += '<tr class="row-durasi">';
+        html += `<td rowspan="4" class="break-block-cell">`;
+        html += `<div class="break-block-info">`;
+        html += `<div class="break-block-title">BREAK ${br.roundNumber}</div>`;
+        html += `<div class="break-block-default">Default: ${formatDuration(br.defaultDuration)}</div>`;
+        html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset</button>`;
+        html += `</div></td>`;
         html += '<td class="label-cell">⏱️ DURASI</td>';
+
         br.slots.forEach(slot => {
           html += '<td class="time-cell durasi-cell">';
           html += `<select class="duration-select ${slot.isCustom ? 'custom-chosen' : ''}" `;
@@ -1419,9 +1450,33 @@
 
           html += '</select></td>';
         });
+
+        html += `<td rowspan="4" class="block-status-cell">`;
+        html += `<span class="block-status-badge ${summary.badgeClass}" title="Jadwal Target Selesai: ${summary.targetStr} | Realisasi Selesai: ${summary.actualStr}">${summary.text}</span>`;
+        html += `</td>`;
         html += '</tr>';
 
-        // MASUK row (Editable Text Input for easy typing & pasting)
+        // 2. MATIKAN LC row
+        html += '<tr class="row-matikan">';
+        html += '<td class="label-cell">🔴 MATIKAN LC</td>';
+        br.slots.forEach(slot => {
+          html += `<td class="time-cell matikan-cell">${formatTime(slot.matikanLC)}</td>`;
+        });
+        html += '</tr>';
+
+        // 3. KELUAR row
+        html += '<tr class="row-keluar">';
+        html += '<td class="label-cell">🚶 KELUAR</td>';
+        br.slots.forEach(slot => {
+          html += '<td class="time-cell keluar-cell">';
+          html += `<input type="text" maxlength="8" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
+          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="keluar" `;
+          html += `value="${formatTime(slot.keluar)}" placeholder="00:00:00" title="Klik atau paste jam keluar ${this._escHtml(slot.staffName)}">`;
+          html += '</td>';
+        });
+        html += '</tr>';
+
+        // 4. MASUK row
         html += '<tr class="row-masuk">';
         html += '<td class="label-cell">✅ MASUK</td>';
         br.slots.forEach(slot => {
@@ -1440,31 +1495,47 @@
           html += '</td>';
         });
         html += '</tr>';
-
-        // STATUS row (Admin completion toggle & inline diff tag)
-        html += '<tr class="row-status">';
-        html += '<td class="label-cell">📌 STATUS</td>';
-        br.slots.forEach(slot => {
-          const diff = slot.actualDuration - slot.chosenDuration;
-          let diffTag = '';
-          if (diff > 0) {
-            diffTag = `<span class="diff-tag slower" title="Lebih lama ${formatDuration(diff)} dari target">⚠️ +${formatDuration(diff)}</span>`;
-          } else if (diff < 0) {
-            diffTag = `<span class="diff-tag faster" title="Lebih cepat ${formatDuration(Math.abs(diff))} dari target">⚡ -${formatDuration(Math.abs(diff))}</span>`;
-          }
-
-          html += '<td class="time-cell status-cell">';
-          html += '<div class="status-cell-wrapper">';
-          html += `<button type="button" class="status-btn ${slot.isCompleted ? 'completed' : 'pending'}" `;
-          html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" `;
-          html += `title="Klik untuk menandai break ${this._escHtml(slot.staffName)} ${slot.isCompleted ? 'belum selesai' : 'sudah selesai'}">`;
-          html += slot.isCompleted ? '✅ Selesai' : '⌛ Belum';
-          html += '</button>';
-          if (diffTag) html += diffTag;
-          html += '</div></td>';
-        });
-        html += '</tr>';
       });
+
+      // Cumulative summary row below Block 4 for each staff member
+      html += '<tr class="row-total-summary">';
+      html += '<td colspan="2" class="label-cell">📊 AKUMULASI CS</td>';
+
+      staff.forEach((s, colIdx) => {
+        let totalChosen = 0;
+        let totalActual = 0;
+
+        schedule.breaks.forEach(br => {
+          const slot = br.slots[colIdx];
+          if (slot) {
+            totalChosen += slot.chosenDuration;
+            totalActual += slot.actualDuration;
+          }
+        });
+
+        const netSecs = totalActual - totalChosen;
+        const absSecs = Math.abs(netSecs);
+        const m = Math.floor(absSecs / 60);
+        const sec = absSecs % 60;
+
+        let timeStr = (m > 0 && sec > 0) ? `${m}m ${sec}s` : (m > 0 ? `${m}m` : `${sec}s`);
+
+        let label = '🎯 On time';
+        let cellClass = 'summary-exact';
+
+        if (netSecs > 0) {
+          label = `⚠️ Slower ${timeStr}`;
+          cellClass = 'summary-slower';
+        } else if (netSecs < 0) {
+          label = `⚡ Faster ${timeStr}`;
+          cellClass = 'summary-faster';
+        }
+
+        html += `<td class="time-cell ${cellClass}" title="Total Target: ${formatDuration(totalChosen)} | Total Realisasi: ${formatDuration(totalActual)}">${label}</td>`;
+      });
+
+      html += '<td class="summary-empty-cell"></td>';
+      html += '</tr>';
 
       html += '</tbody></table>';
       return html;
@@ -1685,18 +1756,43 @@
       const staffNames = schedule.staff.map(s => s.name);
 
       let tsv = `JADWAL BREAK STAFF — ${dateStr}\n`;
-      tsv += 'BREAK / ROW\t' + staffNames.join('\t') + '\n\n';
+      tsv += 'BREAK\tROW\t' + staffNames.join('\t') + '\tSTATUS\n\n';
 
       schedule.breaks.forEach(br => {
-        const summary = ScheduleRenderer._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd);
+        const lastSlot = br.slots[br.slots.length - 1];
+        const lastStaffName = lastSlot ? lastSlot.staffName : '';
+        const summary = ScheduleRenderer._formatDiffSummary(br.diffSecs, br.blockTargetEnd, br.blockActualEnd, br.bottlenecks, lastStaffName);
 
-        tsv += `Break ${br.roundNumber} (${summary.text})\t` + Array(staffNames.length).fill('').join('\t') + '\n';
-        tsv += '🔴 MATIKAN LC\t' + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\n';
-        tsv += '🚶 KELUAR\t' + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\n';
-        tsv += '⏱️ DURASI\t' + br.slots.map(s => formatDuration(s.chosenDuration, true)).join('\t') + '\n';
-        tsv += '✅ MASUK\t' + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\n';
-        tsv += '📌 STATUS\t' + br.slots.map(s => s.isCompleted ? 'Selesai' : 'Belum').join('\t') + '\n\n';
+        const bTitle = `BREAK ${br.roundNumber}\nDefault: ${formatDuration(br.defaultDuration)}`;
+
+        tsv += `${bTitle}\t⏱️ DURASI\t` + br.slots.map(s => formatDuration(s.chosenDuration, true)).join('\t') + `\t${summary.text}\n`;
+        tsv += `\t🔴 MATIKAN LC\t` + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\t\n';
+        tsv += `\t🚶 KELUAR\t` + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\t\n';
+        tsv += `\t✅ MASUK\t` + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\t\n\n';
       });
+
+      // Accumulation row at bottom of TSV
+      let accumRow = '\t📊 AKUMULASI CS\t';
+      const accumLabels = schedule.staff.map((s, colIdx) => {
+        let totalChosen = 0;
+        let totalActual = 0;
+        schedule.breaks.forEach(br => {
+          const slot = br.slots[colIdx];
+          if (slot) {
+            totalChosen += slot.chosenDuration;
+            totalActual += slot.actualDuration;
+          }
+        });
+        const netSecs = totalActual - totalChosen;
+        const absSecs = Math.abs(netSecs);
+        const m = Math.floor(absSecs / 60);
+        const sec = absSecs % 60;
+        let timeStr = (m > 0 && sec > 0) ? `${m}m ${sec}s` : (m > 0 ? `${m}m` : `${sec}s`);
+        if (netSecs > 0) return `Slower ${timeStr}`;
+        if (netSecs < 0) return `Faster ${timeStr}`;
+        return 'On time';
+      });
+      tsv += accumRow + accumLabels.join('\t') + '\t\n';
 
       const notifySuccess = () => {
         showToast('Jadwal berhasil disalin! Tinggal Ctrl+V di Google Sheets / Excel 📊', 'success');
@@ -2137,6 +2233,15 @@
     },
 
     _setupTableHighlight() {
+      document.addEventListener('click', (e) => {
+        const staffTh = e.target.closest('.clickable-staff');
+        if (staffTh) {
+          const staffId = staffTh.dataset.staffId;
+          State.activeCauseStaffId = (State.activeCauseStaffId === staffId) ? null : staffId;
+          this.refreshSchedule();
+        }
+      });
+
       const clearHighlights = (table) => {
         table.querySelectorAll('.row-highlight, .col-highlight').forEach(el => {
           el.classList.remove('row-highlight', 'col-highlight');
