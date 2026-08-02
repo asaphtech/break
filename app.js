@@ -703,7 +703,7 @@
 
     init() {
       const saved = Storage.getStaff();
-      if (saved && saved.length > 0) {
+      if (Array.isArray(saved)) {
         this._staff = saved;
       } else {
         this._staff = JSON.parse(JSON.stringify(DEFAULT_STAFF));
@@ -754,6 +754,9 @@
       // Re-order
       this.getAll().forEach((s, i) => { s.order = i + 1; });
       this._save();
+      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
+        CloudSync.pushData(true, true);
+      }
     },
 
     moveUp(id) {
