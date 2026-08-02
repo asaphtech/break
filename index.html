@@ -1,20 +1,24 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Break Scheduler — Jadwal Break Staff</title>
-  <meta name="description" content="Sistem pengaturan jadwal break staff kantor dengan kalkulasi otomatis berdasarkan jumlah staff aktif">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <meta name="description"
+    content="Sistem pengaturan jadwal break staff kantor dengan kalkulasi otomatis berdasarkan jumlah staff aktif">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="index.css">
 </head>
+
 <body>
   <div class="app">
     <!-- ========== Header ========== -->
     <header class="header">
       <div class="header-left">
         <h1 class="logo">
-          <span class="logo-icon">⏱️</span>
+
           Break Scheduler
         </h1>
       </div>
@@ -38,16 +42,10 @@
     <!-- ========== Navigation ========== -->
     <nav class="nav">
       <button class="nav-tab active" data-tab="schedule" id="navSchedule">
-        <span class="nav-icon">📋</span>
         <span class="nav-label">Jadwal Break</span>
       </button>
       <button class="nav-tab" data-tab="staff" id="navStaff">
-        <span class="nav-icon">👥</span>
-        <span class="nav-label">Kelola Staff</span>
-      </button>
-      <button class="nav-tab" data-tab="attendance" id="navAttendance">
-        <span class="nav-icon">📅</span>
-        <span class="nav-label">Jadwal Kehadiran</span>
+        <span class="nav-label">Kelola Staff & Kehadiran</span>
       </button>
     </nav>
 
@@ -56,29 +54,51 @@
 
       <!-- ===== Schedule Tab ===== -->
       <section class="tab-content active" id="tabSchedule">
+
         <div class="schedule-header">
           <div class="date-picker">
             <button class="btn-icon" id="prevDay" title="Hari sebelumnya">◀</button>
             <input type="date" id="scheduleDate" class="date-input">
             <button class="btn-icon" id="nextDay" title="Hari berikutnya">▶</button>
             <button class="btn-sm" id="todayBtn">Hari Ini</button>
+            <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
+              <label for="customBreakStartTime" style="font-size:0.8rem;color:var(--text-secondary);font-weight:600;">Mulai Break:</label>
+              <input type="time" id="customBreakStartTime" class="form-input time-pick" value="08:00" style="padding:4px 8px;font-size:0.85rem;width:95px;background:var(--bg-main);color:var(--text-primary);border:1px solid var(--border-medium);border-radius:6px;" step="300">
+            </div>
           </div>
+
+          <div class="shift-filter-group" id="shiftFilterGroup">
+            <button type="button" class="btn-shift active" data-shift="pagi">Shift Pagi</button>
+            <button type="button" class="btn-shift" data-shift="malam">Shift Malam</button>
+            <button type="button" class="btn-shift" data-shift="all">Semua Shift</button>
+          </div>
+
+          <div class="schedule-search-box">
+            <input type="text" id="scheduleSearchInput" class="search-input" placeholder="Cari nama / kode staff..." autocomplete="off">
+          </div>
+
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn-secondary" id="copySheetBtn" title="Salin jadwal untuk ditempel ke Google Sheets / Excel">
-              <span>📋</span> Salin ke Google Sheets
+            <button class="btn-smart-calc" id="openSmartCalcBtn"
+              title="Kalkulator Pintar untuk Hitung Staff Aktif, Durasi Break & Jarak Interval">
+              Kalkulator Pintar
+            </button>
+            <button class="btn-secondary" id="copySheetBtn"
+              title="Salin jadwal untuk ditempel ke Google Sheets / Excel">
+              Salin ke Google Sheets
             </button>
             <button class="btn-secondary" id="resetAllBtn" title="Reset seluruh break hari ini ke default">
-              <span>🔄</span> Reset Semua Break
+              Reset Semua Break
             </button>
             <button class="btn-primary" id="printBtn">
-              <span>🖨️</span> Cetak Jadwal
+              Cetak Jadwal
             </button>
           </div>
         </div>
 
         <div class="schedule-notes top-notes">
           <p>Mohon matikan Livechat tepat <strong>3 menit</strong> sebelum jadwal keluar break Anda.</p>
-          <p>Pastikan Anda sudah kembali standby dan Masuk tepat waktu agar CS berikutnya bisa bergantian istirahat tanpa menunda jadwal.</p>
+          <p>Pastikan Anda sudah kembali standby dan Masuk tepat waktu agar CS berikutnya bisa bergantian istirahat
+            tanpa menunda jadwal.</p>
         </div>
 
         <div class="table-wrapper" id="scheduleTableWrapper">
@@ -95,13 +115,14 @@
         <div class="staff-section">
           <div class="card">
             <div class="card-header">
-              <h2>➕ Tambah Staff Baru</h2>
+              <h2>Tambah Staff Baru</h2>
             </div>
             <div class="card-body">
               <form id="addStaffForm" class="staff-form">
                 <div class="form-group">
                   <label for="staffName">Nama / Kode Staff</label>
-                  <input type="text" id="staffName" class="form-input" placeholder="Contoh: PAT, KKY, SUN..." maxlength="10" autocomplete="off" required>
+                  <input type="text" id="staffName" class="form-input" placeholder="Contoh: PAT, KKY, SUN..."
+                    maxlength="10" autocomplete="off" required>
                 </div>
                 <button type="submit" class="btn-primary">Tambah</button>
               </form>
@@ -109,9 +130,18 @@
           </div>
 
           <div class="card">
-            <div class="card-header">
-              <h2>📋 Daftar Staff</h2>
-              <span class="card-badge" id="staffCountBadge">0 staff</span>
+            <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+              <h2>Daftar Staff</h2>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn-sm btn-preset-night" id="presetNightBtn" title="Set PAT, WIL, SUN, LID, WEN ke Shift Malam">Set Malam (PAT, WIL, SUN, LID, WEN)</button>
+                <div class="sort-btn-group">
+                  <button type="button" class="btn-sm btn-sort" id="sortAzBtn" title="Urutkan berdasarkan Abjad A-Z">A-Z</button>
+                  <button type="button" class="btn-sm btn-sort" id="sortZaBtn" title="Urutkan berdasarkan Abjad Z-A">Z-A</button>
+                  <button type="button" class="btn-sm btn-sort" id="sortDefaultBtn" title="Kembalikan ke urutan default">Reset Urutan</button>
+                </div>
+                <input type="text" id="staffSearchInput" class="search-input" placeholder="Cari staff..." style="padding:4px 10px;font-size:0.8rem;border-radius:6px;border:1px solid var(--border-medium);background:var(--bg-main);color:var(--text-primary);width:120px;" autocomplete="off">
+                <span class="card-badge" id="staffCountBadge">0 staff</span>
+              </div>
             </div>
             <div class="card-body">
               <div class="staff-list" id="staffList">
@@ -129,6 +159,9 @@
             <button class="btn-icon" id="prevMonth" title="Bulan sebelumnya">◀</button>
             <span class="month-label" id="monthLabel">—</span>
             <button class="btn-icon" id="nextMonth" title="Bulan berikutnya">▶</button>
+          </div>
+          <div class="schedule-search-box">
+            <input type="text" id="attendanceSearchInput" class="search-input" placeholder="Cari nama staff..." autocomplete="off">
           </div>
           <div class="attendance-legend">
             <span class="legend-item"><span class="legend-dot masuk"></span> Masuk</span>
@@ -153,7 +186,7 @@
   <div class="modal-overlay" id="editModal">
     <div class="modal">
       <div class="modal-header">
-        <h3>✏️ Edit Staff</h3>
+        <h3>Edit Staff</h3>
         <button class="modal-close" id="closeEditModal">✕</button>
       </div>
       <div class="modal-body">
@@ -173,12 +206,13 @@
   <div class="modal-overlay" id="deleteModal">
     <div class="modal">
       <div class="modal-header">
-        <h3>🗑️ Hapus Staff</h3>
+        <h3>Hapus Staff</h3>
         <button class="modal-close" id="closeDeleteModal">✕</button>
       </div>
       <div class="modal-body">
         <p>Apakah Anda yakin ingin menghapus staff <strong id="deleteStaffName">—</strong>?</p>
-        <p style="margin-top:8px;color:var(--text-muted);font-size:0.85rem;">Data kehadiran staff ini juga akan dihapus.</p>
+        <p style="margin-top:8px;color:var(--text-muted);font-size:0.85rem;">Data kehadiran staff ini juga akan dihapus.
+        </p>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" id="cancelDelete">Batal</button>
@@ -191,7 +225,7 @@
   <div class="modal-overlay" id="authModal">
     <div class="modal">
       <div class="modal-header">
-        <h3>🔒 Verifikasi Password Keamanan</h3>
+        <h3>Verifikasi Password Keamanan</h3>
         <button class="modal-close" id="closeAuthModal">✕</button>
       </div>
       <div class="modal-body">
@@ -201,15 +235,17 @@
         <form id="authForm" onsubmit="return false;">
           <div class="form-group">
             <label for="authPasswordInput">Password Keamanan</label>
-            <input type="password" id="authPasswordInput" class="form-input" placeholder="Masukkan password..." required autocomplete="current-password">
+            <input type="password" id="authPasswordInput" class="form-input" placeholder="Masukkan password..." required
+              autocomplete="current-password">
           </div>
-          <div id="authErrorMsg" style="display:none;color:var(--red);font-size:0.85rem;margin-top:6px;font-weight:600;">
-            ⚠️ Password salah! Silakan coba lagi.
+          <div id="authErrorMsg"
+            style="display:none;color:var(--red);font-size:0.85rem;margin-top:6px;font-weight:600;">
+            Password salah! Silakan coba lagi.
           </div>
         </form>
       </div>
       <div class="modal-footer" style="justify-content:space-between;">
-        <button class="btn-sm" id="openChangePassBtn" type="button">🔑 Ubah Password</button>
+        <button class="btn-sm" id="openChangePassBtn" type="button">Ubah Password</button>
         <div style="display:flex;gap:8px;">
           <button class="btn-secondary" id="cancelAuth" type="button">Batal</button>
           <button class="btn-primary" id="confirmAuth" type="button">Buka Akses</button>
@@ -222,7 +258,7 @@
   <div class="modal-overlay" id="changePassModal">
     <div class="modal">
       <div class="modal-header">
-        <h3>🔑 Ubah Password Keamanan</h3>
+        <h3>Ubah Password Keamanan</h3>
         <button class="modal-close" id="closeChangePassModal">✕</button>
       </div>
       <div class="modal-body">
@@ -237,10 +273,12 @@
           </div>
           <div class="form-group">
             <label for="confirmNewPassInput">Konfirmasi Password Baru</label>
-            <input type="password" id="confirmNewPassInput" class="form-input" placeholder="Ulangi password baru..." required>
+            <input type="password" id="confirmNewPassInput" class="form-input" placeholder="Ulangi password baru..."
+              required>
           </div>
-          <div id="changePassErrorMsg" style="display:none;color:var(--red);font-size:0.85rem;margin-top:6px;font-weight:600;">
-            ⚠️ Periksa kembali password Anda!
+          <div id="changePassErrorMsg"
+            style="display:none;color:var(--red);font-size:0.85rem;margin-top:6px;font-weight:600;">
+            Periksa kembali password Anda!
           </div>
         </form>
       </div>
@@ -255,12 +293,13 @@
   <div class="modal-overlay" id="supabaseModal">
     <div class="modal">
       <div class="modal-header">
-        <h3>⚡ Pengaturan Database Supabase</h3>
+        <h3>Pengaturan Database Supabase</h3>
         <button class="modal-close" id="closeSupabaseModal">✕</button>
       </div>
       <div class="modal-body">
         <p style="margin-bottom:14px;color:var(--text-secondary);font-size:0.85rem;">
-          Hubungkan aplikasi ke Supabase agar seluruh data tersimpan permanen di cloud dan tersinkronisasi otomatis antar PC.
+          Hubungkan aplikasi ke Supabase agar seluruh data tersimpan permanen di cloud dan tersinkronisasi otomatis
+          antar PC.
         </p>
         <form id="supabaseForm" onsubmit="return false;">
           <div class="form-group">
@@ -269,7 +308,8 @@
           </div>
           <div class="form-group">
             <label for="supabaseKeyInput">Supabase Anon Key (API Key)</label>
-            <input type="password" id="supabaseKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1Ni..." required>
+            <input type="password" id="supabaseKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1Ni..."
+              required>
           </div>
           <div id="supabaseStatusMsg" style="display:none;font-size:0.85rem;margin-top:6px;font-weight:600;"></div>
         </form>
@@ -281,9 +321,162 @@
     </div>
   </div>
 
+  <!-- ========== Smart Calculator Modal ========== -->
+  <div class="modal-overlay" id="smartCalcModal">
+    <div class="modal modal-xl">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3>Kalkulator Pintar Durasi & Jarak Break</h3>
+          <p class="modal-subtitle">Sistem otomatis menghitung Jumlah Staff Aktif, Durasi Break per Ronde, dan Jarak Durasi Kerja</p>
+        </div>
+        <button class="modal-close" id="closeSmartCalcModal">✕</button>
+      </div>
+      <div class="modal-body smart-calc-body">
+        
+        <!-- Controls & Inputs Row -->
+        <div class="smart-calc-controls-grid">
+          
+          <!-- Control 1: Staff Aktif -->
+          <div class="calc-control-card">
+            <div class="calc-card-title">
+              <span>Staff Aktif</span>
+              <button type="button" class="btn-xs btn-outline-teal" id="syncActiveStaffBtn" title="Gunakan jumlah staff yang aktif (status Masuk) pada jadwal hari ini">
+                Staff Aktif Hari Ini (<span id="calcActiveTodayCount">0</span>)
+              </button>
+            </div>
+            <div class="calc-input-group">
+              <button type="button" class="btn-calc-step" id="calcStaffMinus">—</button>
+              <input type="number" id="calcStaffInput" class="calc-number-input" min="1" max="50" value="8">
+              <button type="button" class="btn-calc-step" id="calcStaffPlus">+</button>
+            </div>
+            <div class="preset-pills">
+              <span class="preset-label">Pilih Jumlah:</span>
+              <button type="button" class="pill-btn" data-staff="5">5</button>
+              <button type="button" class="pill-btn" data-staff="6">6</button>
+              <button type="button" class="pill-btn" data-staff="7">7</button>
+              <button type="button" class="pill-btn active" data-staff="8">8</button>
+              <button type="button" class="pill-btn" data-staff="9">9</button>
+              <button type="button" class="pill-btn" data-staff="10">10</button>
+              <button type="button" class="pill-btn" data-staff="11">11</button>
+            </div>
+            <div class="active-staff-names-box" id="calcStaffNamesList">
+              <!-- Staff badge names -->
+            </div>
+          </div>
+
+          <!-- Control 2: Parameter Shift & Jam Kerja -->
+          <div class="calc-control-card">
+            <div class="calc-card-title">Parameter Shift & Jam Kerja</div>
+            <div class="shift-select-group">
+              <button type="button" class="btn-shift-select active" id="shiftPagi8PresetBtn">Pagi (08:00 - 19:00)</button>
+              <button type="button" class="btn-shift-select" id="shiftPagi820PresetBtn">Pagi (08:20 - 19:00)</button>
+              <button type="button" class="btn-shift-select" id="shiftMalamPresetBtn">Malam (19:00 - 05:20)</button>
+            </div>
+            <div class="time-range-picker">
+              <div class="time-field">
+                <label for="calcStartTime">Mulai Shift</label>
+                <input type="time" id="calcStartTime" class="form-input time-pick" value="08:00" step="60">
+              </div>
+              <div class="time-field">
+                <label for="calcEndTime">Selesai Shift</label>
+                <input type="time" id="calcEndTime" class="form-input time-pick" value="19:00" step="60">
+              </div>
+            </div>
+            <div class="calc-shift-info" id="calcShiftTotalTimeInfo">
+              Total Waktu Shift: <strong>11 Jam 00 Menit</strong> (39.600 Detik)
+            </div>
+          </div>
+
+          <!-- Control 3: Metode & Jarak Break -->
+          <div class="calc-control-card">
+            <div class="calc-card-title">Metode & Jarak Sesi Break</div>
+            <div class="form-group-compact">
+              <label for="calcRoundsCount">Jumlah Ronde Break</label>
+              <select id="calcRoundsCount" class="form-select">
+                <option value="4" selected>4 Ronde (Standard Full Shift)</option>
+                <option value="3">3 Ronde</option>
+                <option value="2">2 Ronde</option>
+              </select>
+            </div>
+            <div class="form-group-compact">
+              <label for="calcDistMode">Metode Pembagian Durasi</label>
+              <select id="calcDistMode" class="form-select">
+                <option value="auto" selected>Otomatis (Proporsional / Arithmetic)</option>
+                <option value="equal">Sama Rata (Equal Split)</option>
+                <option value="custom">Kustom Menit per Ronde</option>
+              </select>
+            </div>
+            <div class="form-group-compact">
+              <label for="calcStaffGap">Jarak Pergantian CS (Estafet)</label>
+              <select id="calcStaffGap" class="form-select">
+                <option value="0" selected>0 Menit (Langsung Sambung / Estafet)</option>
+                <option value="2">2 Menit Jeda CS</option>
+                <option value="3">3 Menit Jeda CS</option>
+                <option value="5">5 Menit Jeda CS</option>
+              </select>
+            </div>
+            <div class="form-group-compact">
+              <label for="calcGapBuffer">Jarak Antar Blok Ronde</label>
+              <select id="calcGapBuffer" class="form-select">
+                <option value="auto" selected>Auto-Fit (Pas Tepat Jam Selesai 19:00)</option>
+                <option value="0">0 Menit (Tanpa Jeda Blok)</option>
+                <option value="15">15 Menit Jeda Blok</option>
+                <option value="30">30 Menit Jeda Blok</option>
+                <option value="45">45 Menit Jeda Blok</option>
+                <option value="60">60 Menit (1 Jam Jeda Blok)</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Custom Durations Inputs Container (Hidden by default unless custom is picked) -->
+        <div class="custom-durations-row" id="customDurationsBox" style="display:none;">
+          <div class="custom-dur-title">Durasi Menit Manual Per Ronde:</div>
+          <div class="custom-dur-inputs">
+            <div class="custom-dur-item">
+              <label>Break 1 (min)</label>
+              <input type="number" id="customDurR1" class="form-input dur-num" value="20" min="1" max="120">
+            </div>
+            <div class="custom-dur-item">
+              <label>Break 2 (min)</label>
+              <input type="number" id="customDurR2" class="form-input dur-num" value="18" min="1" max="120">
+            </div>
+            <div class="custom-dur-item">
+              <label>Break 3 (min)</label>
+              <input type="number" id="customDurR3" class="form-input dur-num" value="17" min="1" max="120">
+            </div>
+            <div class="custom-dur-item">
+              <label>Break 4 (min)</label>
+              <input type="number" id="customDurR4" class="form-input dur-num" value="15" min="1" max="120">
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Calculation Results Dashboard -->
+        <div class="smart-calc-results-section" id="smartCalcResultsBox">
+          <!-- Dynamically Generated Results -->
+        </div>
+
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;">
+        <button type="button" class="btn-secondary" id="copyCalcSummaryBtn">
+          Salin Ringkasan Hasil
+        </button>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn-secondary" id="cancelSmartCalc">Tutup</button>
+          <button type="button" class="btn-primary btn-glow" id="applySmartCalcBtn">
+            Terapkan ke Jadwal Break
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== Toast Container ========== -->
   <div class="toast-container" id="toastContainer"></div>
 
   <script src="app.js"></script>
 </body>
+
 </html>

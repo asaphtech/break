@@ -18,21 +18,21 @@
   const DAYS_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
   const STATUS_CYCLE = ['masuk', 'libur', 'cuti'];
-  const STATUS_ICONS = { masuk: '✅', libur: '🏖️', cuti: '📋' };
+  const STATUS_ICONS = { masuk: '', libur: '🏖️', cuti: '📋' };
   const STATUS_LABELS = { masuk: 'Masuk', libur: 'Libur', cuti: 'Cuti' };
 
   const DEFAULT_STAFF = [
-    { id: 'def_01', name: 'PAT', order: 1 },
-    { id: 'def_02', name: 'KKY', order: 2 },
-    { id: 'def_03', name: 'SUN', order: 3 },
-    { id: 'def_04', name: 'JOY', order: 4 },
-    { id: 'def_05', name: 'DON', order: 5 },
-    { id: 'def_06', name: 'STV', order: 6 },
-    { id: 'def_07', name: 'LID', order: 7 },
-    { id: 'def_08', name: 'WIL', order: 8 },
-    { id: 'def_09', name: 'JUL', order: 9 },
-    { id: 'def_10', name: 'JOHN', order: 10 },
-    { id: 'def_11', name: 'WEN', order: 11 }
+    { id: 'def_01', name: 'PAT', order: 1, shift: 'malam' },
+    { id: 'def_02', name: 'KKY', order: 2, shift: 'pagi' },
+    { id: 'def_03', name: 'SUN', order: 3, shift: 'malam' },
+    { id: 'def_04', name: 'JOY', order: 4, shift: 'pagi' },
+    { id: 'def_05', name: 'DON', order: 5, shift: 'pagi' },
+    { id: 'def_06', name: 'STV', order: 6, shift: 'pagi' },
+    { id: 'def_07', name: 'LID', order: 7, shift: 'malam' },
+    { id: 'def_08', name: 'WIL', order: 8, shift: 'malam' },
+    { id: 'def_09', name: 'JUL', order: 9, shift: 'pagi' },
+    { id: 'def_10', name: 'JOHN', order: 10, shift: 'pagi' },
+    { id: 'def_11', name: 'WEN', order: 11, shift: 'malam' }
   ];
 
   /* ============================================
@@ -82,6 +82,15 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatHoursMinutes(seconds) {
+    const abs = Math.abs(seconds);
+    const h = Math.floor(abs / 3600);
+    const m = Math.floor((abs % 3600) / 60);
+    if (h > 0 && m > 0) return `${h} Jam ${m} Menit`;
+    if (h > 0) return `${h} Jam`;
+    return `${m} Menit`;
   }
 
   function formatDateID(date) {
@@ -233,7 +242,10 @@
             this._mergeState(data);
             StaffManager.init();
             if (!isInitial) {
-              App.refreshAll();
+              const activeTag = document.activeElement ? document.activeElement.tagName : '';
+              if (activeTag !== 'INPUT' && activeTag !== 'SELECT') {
+                App.refreshAll();
+              }
             }
           }
           this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
@@ -247,68 +259,31 @@
       }
     },
 
-    _deepMerge(target, source) {
-      if (!target || typeof target !== 'object') return source ? JSON.parse(JSON.stringify(source)) : {};
-      if (!source || typeof source !== 'object') return target ? JSON.parse(JSON.stringify(target)) : {};
-
-      const output = Object.assign({}, target);
-      Object.keys(source).forEach(key => {
-        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-          output[key] = this._deepMerge(target[key], source[key]);
-        } else {
-          output[key] = source[key];
-        }
-      });
-      return output;
+    _mergeState(data) {
+      if (!data) return;
+      if (Array.isArray(data.staff)) Storage.setStaff(data.staff);
+      if (data.attendance) Storage.set('break_scheduler_attendance', data.attendance);
+      if (data.password) Storage.set('break_scheduler_admin_pass', data.password);
+      if (data.breakChoices) {
+        Object.keys(data.breakChoices).forEach(key => Storage.set(key, data.breakChoices[key]));
+      }
+      if (data.breakOverrides) {
+        Object.keys(data.breakOverrides).forEach(key => Storage.set(key, data.breakOverrides[key]));
+      }
+      if (data.breakStatuses) {
+        Object.keys(data.breakStatuses).forEach(key => Storage.set(key, data.breakStatuses[key]));
+      }
     },
 
-    _mergeState(cloudData) {
-      if (!cloudData || typeof cloudData !== 'object') return;
-
-      const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
-      const cloudUpdatedAt = cloudData.updatedAt || '';
-
-      if (Array.isArray(cloudData.staff) && cloudData.staff.length > 0) {
-        const localStaff = Storage.getStaff();
-        if (!localStaff || localStaff.length === 0 || !localUpdatedAt || new Date(cloudUpdatedAt) >= new Date(localUpdatedAt)) {
-          Storage.setStaff(cloudData.staff);
-        }
-      }
-
-      if (cloudData.password) {
-        const localPass = Storage.get('break_scheduler_pass', '');
-        if (!localPass || !localUpdatedAt || (cloudUpdatedAt && new Date(cloudUpdatedAt) >= new Date(localUpdatedAt))) {
-          Storage.set('break_scheduler_pass', cloudData.password);
-        }
-      }
-
-      const categories = [
-        { key: 'attendance', prefix: 'break_att_' },
-        { key: 'breakChoices', prefix: 'break_choice_' },
-        { key: 'breakOverrides', prefix: 'break_override_' },
-        { key: 'breakStatuses', prefix: 'break_status_' }
-      ];
-
-      categories.forEach(cat => {
-        const cloudDict = cloudData[cat.key] || {};
-        
-        Object.keys(cloudDict).forEach(k => {
-          if (k.startsWith(cat.prefix)) {
-            const localVal = Storage.get(k, null);
-            const cloudVal = cloudDict[k];
-
-            if (!localVal) {
-              Storage.set(k, cloudVal);
-            } else {
-              const merged = this._deepMerge(localVal, cloudVal);
-              Storage.set(k, merged);
-            }
-          }
-        });
-      });
+    _pushDebounceTimer: null,
+    debouncePushData(delayMs = 1200) {
+      if (this._pushDebounceTimer) clearTimeout(this._pushDebounceTimer);
+      this._pushDebounceTimer = setTimeout(() => {
+        this.pushData(false, true);
+      }, delayMs);
     },
 
-    async pushData(force = false) {
+    async pushData(force = false, silent = false) {
       if (!this._initialPullCompleted && !force) {
         console.log('Skipping pushData: initial pull from Cloud is not complete yet.');
         return;
@@ -322,7 +297,7 @@
 
       if (!isSupa && window.location.protocol === 'file:') {
         this.updateBadge('offline', 'Lokal (file://)');
-        showToast('Data tersimpan secara lokal!', 'success');
+        if (!silent) showToast('Data tersimpan secara lokal!', 'success');
         return;
       }
 
@@ -397,14 +372,14 @@
 
         if (res.ok) {
           this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
-          showToast(isSupa ? 'Data tersimpan ke Supabase! ⚡' : 'Data tersinkronisasi ke Cloud! ☁️', 'success');
+          if (!silent) showToast(isSupa ? 'Data tersimpan ke Supabase! ⚡' : 'Data tersinkronisasi ke Cloud! ☁️', 'success');
         } else {
           throw new Error('Push failed');
         }
       } catch (err) {
         console.warn('CloudSync push error:', err);
         this.updateBadge('offline', 'Gagal Sync');
-        showToast('Gagal terhubung ke Cloud (Tersimpan di lokal)', 'info');
+        if (!silent) showToast('Gagal terhubung ke Cloud (Tersimpan di lokal)', 'info');
       }
     },
 
@@ -412,7 +387,7 @@
       if (this._pollTimer) clearInterval(this._pollTimer);
       this._pollTimer = setInterval(() => {
         this.pullData(false);
-      }, 3000);
+      }, 5000);
     },
 
     _setupModalListeners() {
@@ -803,10 +778,67 @@
       }
     },
 
+    sortAlphabetical(asc = true) {
+      this._staff.sort((a, b) => {
+        const nameA = a.name.toUpperCase();
+        const nameB = b.name.toUpperCase();
+        if (nameA < nameB) return asc ? -1 : 1;
+        if (nameA > nameB) return asc ? 1 : -1;
+        return 0;
+      });
+      this._staff.forEach((s, idx) => { s.order = idx + 1; });
+      this._save();
+    },
+
+    resetOrderToDefault() {
+      const defaultMap = new Map(DEFAULT_STAFF.map((s, idx) => [s.name, idx + 1]));
+      this._staff.sort((a, b) => {
+        const orderA = defaultMap.has(a.name) ? defaultMap.get(a.name) : 999;
+        const orderB = defaultMap.has(b.name) ? defaultMap.get(b.name) : 999;
+        return orderA - orderB;
+      });
+      this._staff.forEach((s, idx) => { s.order = idx + 1; });
+      this._save();
+    },
+
+    reorderByIds(idArray) {
+      const map = new Map(idArray.map((id, index) => [id, index + 1]));
+      this._staff.forEach(s => {
+        if (map.has(s.id)) s.order = map.get(s.id);
+      });
+      this._save();
+    },
+
+    setShift(id, shift) {
+      const staff = this.getById(id);
+      if (staff) {
+        staff.shift = shift;
+        this._save();
+      }
+      return staff ? staff.shift : 'pagi';
+    },
+
+    toggleShift(id) {
+      const staff = this.getById(id);
+      if (staff) {
+        staff.shift = staff.shift === 'malam' ? 'pagi' : 'malam';
+        this._save();
+      }
+      return staff ? staff.shift : 'pagi';
+    },
+
+    applyNightPreset(nightNames = ['PAT', 'WIL', 'SUN', 'LID', 'WEN']) {
+      const setNames = new Set(nightNames.map(n => n.toUpperCase()));
+      this._staff.forEach(s => {
+        s.shift = setNames.has(s.name.toUpperCase()) ? 'malam' : 'pagi';
+      });
+      this._save();
+    },
+
     _save() {
       Storage.setStaff(this._staff);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     }
   };
@@ -905,8 +937,8 @@
       if (!choices[staffId]) choices[staffId] = {};
       choices[staffId][`round_${roundNumber}`] = durationSeconds;
       Storage.set(`break_choice_${dateStr}`, choices);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     },
 
@@ -930,8 +962,8 @@
       });
       if (changed) {
         Storage.set(`break_choice_${dateStr}`, choices);
-        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-          CloudSync.pushData();
+        if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+          CloudSync.debouncePushData();
         }
       }
     },
@@ -939,8 +971,8 @@
     resetAll(date) {
       const dateStr = toDateString(date);
       Storage.remove(`break_choice_${dateStr}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     }
   };
@@ -967,8 +999,8 @@
         delete overrides[staffId][`round_${roundNumber}`].keluar;
       }
       Storage.set(`break_override_${dateStr}`, overrides);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     },
 
@@ -985,8 +1017,8 @@
         delete overrides[staffId][`round_${roundNumber}`].masuk;
       }
       Storage.set(`break_override_${dateStr}`, overrides);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     },
 
@@ -1010,8 +1042,8 @@
       });
       if (changed) {
         Storage.set(`break_override_${dateStr}`, overrides);
-        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-          CloudSync.pushData();
+        if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+          CloudSync.debouncePushData();
         }
       }
     },
@@ -1019,8 +1051,8 @@
     resetAll(date) {
       const dateStr = toDateString(date);
       Storage.remove(`break_override_${dateStr}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
       }
     }
   };
@@ -1086,17 +1118,647 @@
   };
 
   /* ============================================
-     Break Calculator
+     Smart Timing Manager
+     ============================================ */
+  const SmartTimingManager = {
+    getConfig(shift = 'pagi') {
+      const saved = Storage.get(`break_smart_timing_${shift}`, null);
+      if (saved && typeof saved === 'object') return saved;
+      return null;
+    },
+
+    setConfig(shift = 'pagi', config) {
+      Storage.set(`break_smart_timing_${shift}`, config);
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
+      }
+    },
+
+    resetConfig(shift = 'pagi') {
+      Storage.remove(`break_smart_timing_${shift}`);
+      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
+        CloudSync.debouncePushData();
+      }
+    }
+  };
+
+  /* ============================================
+     Smart Calculator Engine (Active Staff, Break Duration & Interval)
+     ============================================ */
+  const SmartCalculatorEngine = {
+    calculateSystem(options = {}) {
+      const N = Math.max(1, parseInt(options.staffCount || 8, 10));
+      const shiftStartSec = parseTimeToSeconds(options.startTimeStr || '08:00:00') ?? 28800;
+      let shiftEndSec = parseTimeToSeconds(options.endTimeStr || '19:00:00') ?? 68400;
+
+      if (shiftEndSec <= shiftStartSec) {
+        shiftEndSec += 86400; // Overnight shift handle
+      }
+
+      const totalShiftSec = shiftEndSec - shiftStartSec;
+      const roundsCount = parseInt(options.roundsCount || 4, 10);
+      const distMode = options.distMode || 'auto';
+      const staffGapSec = parseInt(options.staffGapSec || 0, 10) * 60;
+      const rawGapBufferOption = options.gapBufferOption || 'auto';
+
+      let roundDurationsSec = [];
+      if (distMode === 'custom' && Array.isArray(options.customDurationsMin) && options.customDurationsMin.length === roundsCount) {
+        roundDurationsSec = options.customDurationsMin.map(m => Math.max(60, Math.round((parseFloat(m) || 15) * 60)));
+      } else if (distMode === 'equal') {
+        const perPersonTotalSec = Math.floor(totalShiftSec / N);
+        const eqSec = Math.min(1200, Math.floor(perPersonTotalSec / roundsCount));
+        roundDurationsSec = Array(roundsCount).fill(eqSec);
+      } else {
+        // Priority 20 Minutes (1200s) Break Quota per CS
+        const targetBreakSecPerRound = 1200; // 20 minutes
+        const maxBreaksAllowedSec = Math.floor(totalShiftSec / (roundsCount * N));
+
+        // Give full 20 minutes to all staff if shift window allows
+        if (maxBreaksAllowedSec >= targetBreakSecPerRound) {
+          roundDurationsSec = Array(roundsCount).fill(targetBreakSecPerRound);
+        } else {
+          const adjustedSec = Math.max(600, Math.floor(maxBreaksAllowedSec / 10) * 10);
+          roundDurationsSec = Array(roundsCount).fill(adjustedSec);
+        }
+      }
+
+      const totalBreakSecPerStaff = roundDurationsSec.reduce((a, b) => a + b, 0);
+      const totalNetWorkSecPerStaff = totalShiftSec - totalBreakSecPerStaff;
+      const totalDeptBreakSec = N * totalBreakSecPerStaff;
+
+      // Calculate Total Time Needed For All Rounds
+      let totalRoundsSec = 0;
+      for (let r = 0; r < roundsCount; r++) {
+        totalRoundsSec += N * roundDurationsSec[r] + (N - 1) * staffGapSec;
+      }
+
+      let gapBufferSec = 0;
+      if (rawGapBufferOption === 'auto') {
+        const remainingShiftSec = totalShiftSec - totalRoundsSec;
+        if (remainingShiftSec > 0 && roundsCount > 1) {
+          gapBufferSec = Math.floor(remainingShiftSec / (roundsCount - 1));
+        } else {
+          gapBufferSec = 0;
+        }
+      } else {
+        gapBufferSec = parseInt(rawGapBufferOption || 0, 10) * 60;
+      }
+
+      // Calculate Round Rotations
+      const roundDetails = [];
+      let currentPointer = shiftStartSec;
+
+      for (let r = 0; r < roundsCount; r++) {
+        const durSec = roundDurationsSec[r];
+        const roundTotalSec = N * durSec + (N - 1) * staffGapSec;
+        const roundStartSec = currentPointer;
+        const roundEndSec = roundStartSec + roundTotalSec;
+
+        roundDetails.push({
+          roundNumber: r + 1,
+          durSec: durSec,
+          durMin: Math.round(durSec / 60),
+          roundStartSec: roundStartSec,
+          roundEndSec: roundEndSec,
+          roundTotalSec: roundTotalSec,
+          staffGapSec: staffGapSec,
+          staggerIntervalSec: durSec + staffGapSec
+        });
+
+        currentPointer = roundEndSec + gapBufferSec;
+      }
+
+      // Calculate Work Intervals ("Jarak Durasi Kerja")
+      const staff1FirstBreakStart = roundDetails[0].roundStartSec;
+      const staff1WorkBeforeB1 = staff1FirstBreakStart - shiftStartSec;
+      const staffNFirstBreakStart = roundDetails[0].roundStartSec + (N - 1) * (roundDurationsSec[0] + staffGapSec);
+      const staffNWorkBeforeB1 = staffNFirstBreakStart - shiftStartSec;
+      const avgWorkBeforeB1 = (staff1WorkBeforeB1 + staffNWorkBeforeB1) / 2;
+
+      const interRoundIntervals = [];
+      for (let r = 0; r < roundsCount - 1; r++) {
+        const r1 = roundDetails[r];
+        const r2 = roundDetails[r + 1];
+
+        const staff1Gap = r2.roundStartSec - (r1.roundStartSec + r1.durSec);
+        const staffNGap = (r2.roundStartSec + (N - 1) * (r2.durSec + staffGapSec)) - (r1.roundStartSec + (N - 1) * (r1.durSec + staffGapSec) + r1.durSec);
+
+        interRoundIntervals.push({
+          fromRound: r + 1,
+          toRound: r + 2,
+          minIntervalSec: Math.min(staff1Gap, staffNGap),
+          maxIntervalSec: Math.max(staff1Gap, staffNGap),
+          avgIntervalSec: (staff1Gap + staffNGap) / 2,
+          roundGapSec: r2.roundStartSec - r1.roundEndSec
+        });
+      }
+
+      const lastRound = roundDetails[roundsCount - 1];
+      const staff1WorkAfterLast = shiftEndSec - (lastRound.roundStartSec + lastRound.durSec);
+      const staffNWorkAfterLast = shiftEndSec - (lastRound.roundStartSec + (N - 1) * (lastRound.durSec + staffGapSec) + lastRound.durSec);
+      const avgWorkAfterLast = (staff1WorkAfterLast + staffNWorkAfterLast) / 2;
+
+      const finalBreakEndSec = roundDetails[roundsCount - 1].roundEndSec;
+      const isFinishExact = Math.abs(finalBreakEndSec - shiftEndSec) <= 60;
+
+      return {
+        staffCount: N,
+        totalShiftSec,
+        shiftStartSec,
+        shiftEndSec,
+        roundsCount,
+        distMode,
+        staffGapSec,
+        gapBufferOption: rawGapBufferOption,
+        gapBufferSec,
+        roundDurationsSec,
+        totalBreakSecPerStaff,
+        totalNetWorkSecPerStaff,
+        totalDeptBreakSec,
+        roundDetails,
+        finalBreakEndSec,
+        isFinishExact,
+        intervals: {
+          staff1WorkBeforeB1,
+          staffNWorkBeforeB1,
+          avgWorkBeforeB1,
+          interRoundIntervals,
+          staff1WorkAfterLast,
+          staffNWorkAfterLast,
+          avgWorkAfterLast
+        }
+      };
+    }
+  };
+
+  /* ============================================
+     Smart Calculator UI Controller
+     ============================================ */
+  const SmartCalculatorUI = {
+    _activeResult: null,
+
+    init() {
+      this._bindEvents();
+    },
+
+    openModal() {
+      const modal = document.getElementById('smartCalcModal');
+      if (!modal) return;
+
+      const date = State.scheduleDate || new Date();
+      const activeStaffToday = AttendanceManager.getActiveStaffForDate(date);
+      const todayCount = activeStaffToday.length;
+
+      const activeTodayBadge = document.getElementById('calcActiveTodayCount');
+      if (activeTodayBadge) activeTodayBadge.textContent = todayCount;
+
+      const staffInput = document.getElementById('calcStaffInput');
+      if (staffInput && todayCount > 0) {
+        staffInput.value = todayCount;
+      }
+
+      this._renderStaffNames(activeStaffToday);
+      this.updateCalculation();
+
+      modal.classList.add('show');
+    },
+
+    closeModal() {
+      const modal = document.getElementById('smartCalcModal');
+      if (modal) modal.classList.remove('show');
+    },
+
+    _renderStaffNames(staffList) {
+      const box = document.getElementById('calcStaffNamesList');
+      if (!box) return;
+      if (!staffList || staffList.length === 0) {
+        box.innerHTML = '<span style="font-size:0.7rem;color:var(--text-muted);">Belum ada staff aktif pada tanggal ini</span>';
+        return;
+      }
+      box.innerHTML = staffList.map(s => `<span class="calc-staff-chip">${s.name}</span>`).join('');
+    },
+
+    updateCalculation() {
+      const staffInput = document.getElementById('calcStaffInput');
+      const staffCount = parseInt(staffInput ? staffInput.value : 6, 10) || 6;
+
+      const startTimeStr = document.getElementById('calcStartTime')?.value || '08:00';
+      const endTimeStr = document.getElementById('calcEndTime')?.value || '19:00';
+
+      const roundsCount = parseInt(document.getElementById('calcRoundsCount')?.value || 4, 10);
+      const distMode = document.getElementById('calcDistMode')?.value || 'auto';
+      const staffGapSec = parseInt(document.getElementById('calcStaffGap')?.value || 0, 10);
+      const gapBufferOption = document.getElementById('calcGapBuffer')?.value || 'auto';
+
+      const customBox = document.getElementById('customDurationsBox');
+      if (customBox) {
+        customBox.style.display = (distMode === 'custom') ? 'block' : 'none';
+      }
+
+      const customDurationsMin = [
+        parseFloat(document.getElementById('customDurR1')?.value) || 20,
+        parseFloat(document.getElementById('customDurR2')?.value) || 18,
+        parseFloat(document.getElementById('customDurR3')?.value) || 17,
+        parseFloat(document.getElementById('customDurR4')?.value) || 15
+      ];
+
+      const res = SmartCalculatorEngine.calculateSystem({
+        staffCount,
+        startTimeStr,
+        endTimeStr,
+        roundsCount,
+        distMode,
+        staffGapSec,
+        gapBufferOption,
+        customDurationsMin
+      });
+
+      this._activeResult = res;
+
+      const shiftInfoEl = document.getElementById('calcShiftTotalTimeInfo');
+      if (shiftInfoEl) {
+        shiftInfoEl.innerHTML = `Total Waktu Shift: <strong>${formatHoursMinutes(res.totalShiftSec)}</strong> (${res.totalShiftSec.toLocaleString()} Detik)`;
+      }
+
+      const resultsBox = document.getElementById('smartCalcResultsBox');
+      if (resultsBox) {
+        resultsBox.innerHTML = this._buildResultsHTML(res);
+      }
+    },
+
+    _buildResultsHTML(res) {
+      const totalBreakMin = Math.round(res.totalBreakSecPerStaff / 60);
+      const productivityPct = ((res.totalNetWorkSecPerStaff / res.totalShiftSec) * 100).toFixed(1);
+      const finalEndTimeStr = formatTime(res.finalBreakEndSec % 86400).substring(0, 5);
+
+      let html = '';
+
+      // 1. Metric Stat Cards
+      html += '<div class="calc-stats-grid">';
+      html += `  <div class="calc-stat-card">
+                   <span class="stat-label">👥 Staff Aktif</span>
+                   <span class="stat-value">${res.staffCount} Staff</span>
+                   <span class="stat-subtext">Jumlah CS bertugas pada shift ini</span>
+                 </div>`;
+      html += `  <div class="calc-stat-card stat-cyan">
+                   <span class="stat-label">⏱️ Total Break / Staff</span>
+                   <span class="stat-value">${totalBreakMin} Menit</span>
+                   <span class="stat-subtext">${res.roundsCount} Ronde sesi istirahat</span>
+                 </div>`;
+      html += `  <div class="calc-stat-card stat-purple">
+                   <span class="stat-label">💼 Jam Kerja Efektif</span>
+                   <span class="stat-value">${formatHoursMinutes(res.totalNetWorkSecPerStaff)}</span>
+                   <span class="stat-subtext">${productivityPct}% waktu kerja aktif CS</span>
+                 </div>`;
+      html += `  <div class="calc-stat-card stat-amber">
+                   <span class="stat-label">🎯 Akhir Sesi Break</span>
+                   <span class="stat-value">${finalEndTimeStr} WIB</span>
+                   <span class="stat-subtext">${res.isFinishExact ? '✅ Selesai Pas Tepat Shift' : 'Jeda Blok: ' + formatHoursMinutes(res.gapBufferSec)}</span>
+                 </div>`;
+      html += '</div>';
+
+      // 2. Details Grid (Durasi per Ronde & Jarak Durasi Kerja)
+      html += '<div class="calc-details-grid">';
+
+      // Panel 1: Rincian Durasi Break Per Ronde
+      html += '  <div class="calc-card-panel">';
+      html += '    <div class="panel-header">🎯 Rincian Durasi Break Per Ronde</div>';
+      html += '    <table class="calc-table"><thead><tr>';
+      html += '      <th>RONDE</th><th>DURASI / CS</th><th>TOTAL SESI</th><th>JAM SESI</th>';
+      html += '    </tr></thead><tbody>';
+
+      res.roundDetails.forEach(rd => {
+        const startT = formatTime(rd.roundStartSec);
+        const endT = formatTime(rd.roundEndSec % 86400);
+        html += `<tr>`;
+        html += `  <td><span class="round-badge-tag">Ronde ${rd.roundNumber}</span></td>`;
+        html += `  <td><strong>${rd.durMin} Mins</strong></td>`;
+        html += `  <td>${formatHoursMinutes(rd.roundTotalSec)}</td>`;
+        html += `  <td><span class="time-mono">${startT.substring(0,5)} - ${endT.substring(0,5)}</span></td>`;
+        html += `</tr>`;
+      });
+
+      html += '    </tbody></table>';
+      html += '  </div>';
+
+      // Panel 2: Rincian Jarak Durasi (Work Intervals & Spacing)
+      html += '  <div class="calc-card-panel">';
+      html += '    <div class="panel-header">📏 Rincian Jarak Durasi Kerja & Estafet</div>';
+      html += '    <div class="interval-cards-list">';
+
+      const staffGapText = res.staffGapSec === 0
+        ? '0 Menit (Langsung Sambung / Estafet)'
+        : `${Math.round(res.staffGapSec / 60)} Menit Jeda Pergantian CS`;
+
+      html += `      <div class="interval-card-item">
+                       <div class="interval-info">
+                         <span class="interval-name">🔄 Jarak Estafet CS (Menit Selesai ➔ CS Berikutnya)</span>
+                         <span class="interval-desc">Jarak dari CS selesai break ke CS berikutnya berangkat</span>
+                       </div>
+                       <span class="interval-badge">${staffGapText}</span>
+                     </div>`;
+
+      html += `      <div class="interval-card-item">
+                       <div class="interval-info">
+                         <span class="interval-name">🚀 Awal Shift ➔ Break 1</span>
+                         <span class="interval-desc">Waktu kerja sebelum ronde 1 dimulai</span>
+                       </div>
+                       <span class="interval-badge">${formatHoursMinutes(res.intervals.avgWorkBeforeB1)}</span>
+                     </div>`;
+
+      res.intervals.interRoundIntervals.forEach(iri => {
+        html += `      <div class="interval-card-item">
+                         <div class="interval-info">
+                           <span class="interval-name">⏸️ Jarak Antar Blok (Break ${iri.fromRound} ➔ Break ${iri.toRound})</span>
+                           <span class="interval-desc">Jeda jam kerja bebas antar Ronde ${iri.fromRound} ke Ronde ${iri.toRound}</span>
+                         </div>
+                         <span class="interval-badge" style="color:var(--cyan);">${formatHoursMinutes(iri.roundGapSec)}</span>
+                       </div>`;
+      });
+
+      html += `      <div class="interval-card-item">
+                       <div class="interval-info">
+                         <span class="interval-name">🏁 Break ${res.roundsCount} ➔ Akhir Shift</span>
+                         <span class="interval-desc">Sisa waktu kerja CS dari break terakhir sampai jam pulang</span>
+                       </div>
+                       <span class="interval-badge">${formatHoursMinutes(res.intervals.avgWorkAfterLast)}</span>
+                     </div>`;
+
+      html += '    </div>';
+      html += '  </div>';
+
+      html += '</div>';
+
+      // 3. Visual Timeline Bar
+      html += '<div class="visual-timeline-card">';
+      html += '  <div class="timeline-title">📊 Visual Timeline Rotasi & Jarak Break</div>';
+      html += '  <div class="timeline-track-wrapper">';
+      html += '    <div class="timeline-bar-track">';
+
+      const totalSec = res.totalShiftSec;
+
+      const p1 = (res.intervals.avgWorkBeforeB1 / totalSec) * 100;
+      if (p1 > 0) {
+        html += `<div class="timeline-seg seg-work" style="width:${p1.toFixed(2)}%;" title="Sesi Kerja Awal: ${formatHoursMinutes(res.intervals.avgWorkBeforeB1)}">Kerja 1</div>`;
+      }
+
+      res.roundDetails.forEach((rd, idx) => {
+        const pR = (rd.roundTotalSec / totalSec) * 100;
+        const breakClass = `seg-break-${(idx % 4) + 1}`;
+        html += `<div class="timeline-seg ${breakClass}" style="width:${pR.toFixed(2)}%;" title="Sesi Break Ronde ${rd.roundNumber}: ${formatTime(rd.roundStartSec).substring(0,5)} - ${formatTime(rd.roundEndSec % 86400).substring(0,5)} (${res.staffCount} CS × ${rd.durMin}m)">Break ${rd.roundNumber}</div>`;
+
+        if (idx < res.intervals.interRoundIntervals.length) {
+          const gapSec = res.intervals.interRoundIntervals[idx].roundGapSec;
+          const pGap = (gapSec / totalSec) * 100;
+          if (pGap > 0) {
+            html += `<div class="timeline-seg seg-work" style="width:${pGap.toFixed(2)}%;" title="Jarak Kerja B${idx+1} ➔ B${idx+2}: ${formatHoursMinutes(gapSec)}">Jarak R${idx+1}-R${idx+2}</div>`;
+          }
+        }
+      });
+
+      const pEnd = (res.intervals.avgWorkAfterLast / totalSec) * 100;
+      if (pEnd > 0) {
+        html += `<div class="timeline-seg seg-work" style="width:${pEnd.toFixed(2)}%;" title="Sesi Kerja Akhir: ${formatHoursMinutes(res.intervals.avgWorkAfterLast)}">Kerja Akhir</div>`;
+      }
+
+      html += '    </div>';
+
+      html += '    <div class="timeline-legend">';
+      html += '      <div class="timeline-legend-item"><span class="legend-color-dot" style="background:#3b82f6;"></span> Sesi Jam Kerja / Jarak Antar Blok</div>';
+      html += '      <div class="timeline-legend-item"><span class="legend-color-dot" style="background:#14b8a6;"></span> Sesi Break Ronde 1</div>';
+      html += '      <div class="timeline-legend-item"><span class="legend-color-dot" style="background:#38bdf8;"></span> Sesi Break Ronde 2</div>';
+      html += '      <div class="timeline-legend-item"><span class="legend-color-dot" style="background:#a78bfa;"></span> Sesi Break Ronde 3</div>';
+      html += '      <div class="timeline-legend-item"><span class="legend-color-dot" style="background:#fbbf24;"></span> Sesi Break Ronde 4</div>';
+      html += '    </div>';
+
+      html += '  </div>';
+      html += '</div>';
+
+      return html;
+    },
+
+    _bindEvents() {
+      const openBtn = document.getElementById('openSmartCalcBtn');
+      const closeBtn = document.getElementById('closeSmartCalcModal');
+      const cancelBtn = document.getElementById('cancelSmartCalc');
+      const modal = document.getElementById('smartCalcModal');
+      const applyBtn = document.getElementById('applySmartCalcBtn');
+      const copyBtn = document.getElementById('copyCalcSummaryBtn');
+
+      if (openBtn) openBtn.addEventListener('click', () => this.openModal());
+      if (closeBtn) closeBtn.addEventListener('click', () => this.closeModal());
+      if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeModal());
+
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) this.closeModal();
+        });
+      }
+
+      const staffInput = document.getElementById('calcStaffInput');
+      const minusBtn = document.getElementById('calcStaffMinus');
+      const plusBtn = document.getElementById('calcStaffPlus');
+      const syncBtn = document.getElementById('syncActiveStaffBtn');
+
+      if (minusBtn && staffInput) {
+        minusBtn.addEventListener('click', () => {
+          let val = parseInt(staffInput.value, 10) || 1;
+          if (val > 1) {
+            staffInput.value = val - 1;
+            this._updatePresetActivePill(val - 1);
+            this.updateCalculation();
+          }
+        });
+      }
+
+      if (plusBtn && staffInput) {
+        plusBtn.addEventListener('click', () => {
+          let val = parseInt(staffInput.value, 10) || 1;
+          if (val < 50) {
+            staffInput.value = val + 1;
+            this._updatePresetActivePill(val + 1);
+            this.updateCalculation();
+          }
+        });
+      }
+
+      if (staffInput) {
+        staffInput.addEventListener('input', () => {
+          let val = parseInt(staffInput.value, 10) || 1;
+          this._updatePresetActivePill(val);
+          this.updateCalculation();
+        });
+      }
+
+      if (syncBtn) {
+        syncBtn.addEventListener('click', () => {
+          const date = State.scheduleDate || new Date();
+          const activeStaffToday = AttendanceManager.getActiveStaffForDate(date);
+          if (activeStaffToday.length > 0 && staffInput) {
+            staffInput.value = activeStaffToday.length;
+            this._updatePresetActivePill(activeStaffToday.length);
+            this._renderStaffNames(activeStaffToday);
+            this.updateCalculation();
+            showToast(`Menggunakan ${activeStaffToday.length} staff aktif hari ini!`);
+          } else {
+            showToast('Tidak ada staff aktif pada tanggal ini', 'info');
+          }
+        });
+      }
+
+      const pills = document.querySelectorAll('.preset-pills .pill-btn');
+      pills.forEach(p => {
+        p.addEventListener('click', () => {
+          const sVal = parseInt(p.dataset.staff, 10);
+          if (staffInput) staffInput.value = sVal;
+          this._updatePresetActivePill(sVal);
+          this.updateCalculation();
+        });
+      });
+
+      const shiftPagi8PresetBtn = document.getElementById('shiftPagi8PresetBtn');
+      const shiftPagi820PresetBtn = document.getElementById('shiftPagi820PresetBtn');
+      const shiftMalamPresetBtn = document.getElementById('shiftMalamPresetBtn');
+      const startTimeInput = document.getElementById('calcStartTime');
+      const endTimeInput = document.getElementById('calcEndTime');
+
+      const resetShiftBtns = () => {
+        if (shiftPagi8PresetBtn) shiftPagi8PresetBtn.classList.remove('active');
+        if (shiftPagi820PresetBtn) shiftPagi820PresetBtn.classList.remove('active');
+        if (shiftMalamPresetBtn) shiftMalamPresetBtn.classList.remove('active');
+      };
+
+      if (shiftPagi8PresetBtn) {
+        shiftPagi8PresetBtn.addEventListener('click', () => {
+          resetShiftBtns();
+          shiftPagi8PresetBtn.classList.add('active');
+          if (startTimeInput) startTimeInput.value = '08:00';
+          if (endTimeInput) endTimeInput.value = '19:00';
+          this.updateCalculation();
+        });
+      }
+
+      if (shiftPagi820PresetBtn) {
+        shiftPagi820PresetBtn.addEventListener('click', () => {
+          resetShiftBtns();
+          shiftPagi820PresetBtn.classList.add('active');
+          if (startTimeInput) startTimeInput.value = '08:20';
+          if (endTimeInput) endTimeInput.value = '19:00';
+          this.updateCalculation();
+        });
+      }
+
+      if (shiftMalamPresetBtn) {
+        shiftMalamPresetBtn.addEventListener('click', () => {
+          resetShiftBtns();
+          shiftMalamPresetBtn.classList.add('active');
+          if (startTimeInput) startTimeInput.value = '19:00';
+          if (endTimeInput) endTimeInput.value = '05:20';
+          this.updateCalculation();
+        });
+      }
+
+      ['calcStartTime', 'calcEndTime', 'calcRoundsCount', 'calcDistMode', 'calcStaffGap', 'calcGapBuffer', 'customDurR1', 'customDurR2', 'customDurR3', 'customDurR4'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', () => this.updateCalculation());
+          el.addEventListener('input', () => this.updateCalculation());
+        }
+      });
+
+      if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+          AuthManager.requireAuth(() => {
+            this.applyToSchedule();
+          });
+        });
+      }
+
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          this.copySummary();
+        });
+      }
+    },
+
+    _updatePresetActivePill(val) {
+      const pills = document.querySelectorAll('.preset-pills .pill-btn');
+      pills.forEach(p => {
+        const pVal = parseInt(p.dataset.staff, 10);
+        if (pVal === val) {
+          p.classList.add('active');
+        } else {
+          p.classList.remove('active');
+        }
+      });
+    },
+
+    applyToSchedule() {
+      if (!this._activeResult) return;
+      const res = this._activeResult;
+
+      const currentShift = State.shiftFilter === 'malam' ? 'malam' : 'pagi';
+      const durationsMin = res.roundDurationsSec.map(s => Math.round(s / 60));
+
+      const config = {
+        staffCount: res.staffCount,
+        durations: durationsMin,
+        startTimeSec: res.shiftStartSec,
+        gaps: Array(res.roundsCount).fill(res.gapBufferSec / 60)
+      };
+
+      SmartTimingManager.setConfig(currentShift, config);
+
+      this.closeModal();
+      App.refreshSchedule();
+      showToast(`⚡ Parametrisasi Kalkulator Pintar diterapkan ke ${res.staffCount} staff shift ${currentShift}!`, 'success');
+    },
+
+    copySummary() {
+      if (!this._activeResult) return;
+      const res = this._activeResult;
+
+      let text = `🧠 RINGKASAN KALKULASI PINTAR BREAK STAFF\n`;
+      text += `--------------------------------------------------\n`;
+      text += `👥 Jumlah Staff Aktif : ${res.staffCount} CS\n`;
+      text += `⏰ Jam Shift Kerja    : ${formatTime(res.shiftStartSec).substring(0,5)} - ${formatTime(res.shiftEndSec % 86400).substring(0,5)} (${formatHoursMinutes(res.totalShiftSec)})\n`;
+      text += `🎯 Akhir Sesi Ronde 4 : ${formatTime(res.finalBreakEndSec % 86400).substring(0,5)} WIB (${res.isFinishExact ? 'Pas Tepat Shift' : 'Buffer'})\n`;
+      text += `⏱️ Total Break/Staff  : ${Math.round(res.totalBreakSecPerStaff / 60)} Menit (${res.roundsCount} Sesi Ronde)\n`;
+      text += `💼 Kerja Efektif/Staff: ${formatHoursMinutes(res.totalNetWorkSecPerStaff)}\n\n`;
+
+      text += `🎯 RINCIAN DURASI BREAK PER RONDE:\n`;
+      res.roundDetails.forEach(rd => {
+        text += `  • Ronde ${rd.roundNumber} : ${rd.durMin} Menit per CS (Sesi: ${formatTime(rd.roundStartSec).substring(0,5)} - ${formatTime(rd.roundEndSec % 86400).substring(0,5)})\n`;
+      });
+
+      text += `\n📏 RINCIAN JARAK DURASI KERJA & ESTAFET:\n`;
+      text += `  • Jarak Estafet CS           : ${res.staffGapSec === 0 ? '0 Menit (Langsung Sambung)' : Math.round(res.staffGapSec / 60) + ' Menit'}\n`;
+      text += `  • Jam Kerja ke Break 1       : ${formatHoursMinutes(res.intervals.avgWorkBeforeB1)}\n`;
+      res.intervals.interRoundIntervals.forEach(iri => {
+        text += `  • Jarak Antar Blok (R${iri.fromRound} ➔ R${iri.toRound}) : ${formatHoursMinutes(iri.roundGapSec)}\n`;
+      });
+      text += `  • Jam Kerja Akhir Shift      : ${formatHoursMinutes(res.intervals.avgWorkAfterLast)}\n`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Ringkasan hasil kalkulasi berhasil disalin!');
+      }).catch(() => {
+        showToast('Gagal menyalin ringkasan', 'error');
+      });
+    }
+  };
+
+
+  /* ============================================
+     Break Calculator Engine
      ============================================ */
   const BreakCalculator = {
     /**
-     * Calculate 4 break durations (in seconds) for N staff.
-     * Uses Arithmetic Progression: B1 >= B2 >= B3 >= B4.
-     * B1 is always 20 min (1200s) when possible.
+     * Calculate default durations for each of the 4 break rounds based on staff count N.
      */
     calculateDurations(N) {
-      if (N <= 0) return [];
+      if (N <= 0) return [MAX_BREAK_DURATION, MAX_BREAK_DURATION, MAX_BREAK_DURATION, MAX_BREAK_DURATION];
 
+      // Total time per person allowed across 4 breaks
       const perPerson = Math.floor(TOTAL_SECONDS / N);
 
       // If enough time for all breaks at max duration
@@ -1105,7 +1767,6 @@
       }
 
       // Arithmetic Progression: B1=1200, B2=1200-d, B3=1200-2d, B4=1200-3d
-      // Sum = 4×1200 - 6d = perPerson  →  d = (4800 - perPerson) / 6
       const dRaw = (MAX_BREAK_DURATION * MAX_BREAK_COUNT - perPerson) / 6;
 
       let B1 = MAX_BREAK_DURATION;
@@ -1139,37 +1800,77 @@
      * Generate the full break schedule for a list of active staff.
      */
     generateSchedule(activeStaff, date) {
-      const N = activeStaff.length;
+      let filteredStaff = activeStaff;
+      if (State.shiftFilter && State.shiftFilter !== 'all') {
+        filteredStaff = activeStaff.filter(s => (s.shift || 'pagi') === State.shiftFilter);
+      }
+
+      const N = filteredStaff.length;
       if (N === 0) return null;
 
+      const currentShift = State.shiftFilter === 'malam' ? 'malam' : 'pagi';
+      const smartConfig = SmartTimingManager.getConfig(currentShift);
       const targetDate = date || State.scheduleDate || new Date();
-      const defaultDurations = this.calculateDurations(N);
+
+      let startTimeStr = '08:00';
+      if (State.customBreakStartTimeSec !== undefined) {
+        startTimeStr = formatTime(State.customBreakStartTimeSec).substring(0, 5);
+      } else if (currentShift === 'malam') {
+        startTimeStr = '19:00';
+      }
+
+      // Automated Smart Calculator System Engine by Default!
+      const autoCalcRes = SmartCalculatorEngine.calculateSystem({
+        staffCount: N,
+        startTimeStr: startTimeStr,
+        endTimeStr: (currentShift === 'malam') ? '05:20' : '19:00',
+        roundsCount: 4,
+        distMode: 'auto',
+        staffGapSec: 0,
+        gapBufferOption: 'auto'
+      });
+
+      let defaultDurations = autoCalcRes.roundDurationsSec;
+
+      if (smartConfig && Array.isArray(smartConfig.durations) && smartConfig.durations.length === 4) {
+        defaultDurations = smartConfig.durations.map(m => m * 60);
+      }
+
       const schedule = {
         staffCount: N,
-        staff: activeStaff,
+        staff: filteredStaff,
         durations: defaultDurations,
+        autoCalcRes: autoCalcRes,
         breaks: []
       };
 
-      let roundStart = START_SECONDS;
-
       const usedDurationsByStaff = {};
-      activeStaff.forEach(s => {
+      filteredStaff.forEach(s => {
         usedDurationsByStaff[s.id] = new Set();
       });
 
       for (let r = 0; r < MAX_BREAK_COUNT; r++) {
         const defaultDuration = defaultDurations[r];
+
+        // Determine round start time (from manual config or auto-calculated Auto-Fit gap)
+        let roundStart;
+        if (smartConfig && smartConfig.startTimeSec !== undefined) {
+          roundStart = smartConfig.startTimeSec + r * ((smartConfig.gaps && smartConfig.gaps[r] !== undefined ? smartConfig.gaps[r] * 60 : 0) + N * defaultDuration);
+        } else {
+          roundStart = autoCalcRes.roundDetails[r] ? autoCalcRes.roundDetails[r].roundStartSec : ((currentShift === 'malam') ? 68400 : 28800);
+        }
+
         const breakRound = {
           roundNumber: r + 1,
           defaultDuration: defaultDuration,
+          roundStart: roundStart,
           slots: []
         };
 
         let currentPointer = roundStart;
 
         for (let i = 0; i < N; i++) {
-          const staff = activeStaff[i];
+          const staff = filteredStaff[i];
           const staffUsed = usedDurationsByStaff[staff.id];
 
           const savedChoice = BreakChoiceManager.getStaffChoice(
@@ -1269,10 +1970,52 @@
         breakRound.totalScheduledDuration = totalScheduledDuration;
         breakRound.totalActualDuration = blockActualEnd - blockStart;
 
-        // Next break round starts when the last staff member of this round finishes!
-        roundStart = currentPointer;
+        // Next break round starts when the last staff member of this round finishes + optional gap!
+        const gapSecs = (smartConfig && Array.isArray(smartConfig.gaps) && smartConfig.gaps[r] !== undefined)
+          ? (smartConfig.gaps[r] * 60)
+          : 0;
+        roundStart = currentPointer + gapSecs;
         schedule.breaks.push(breakRound);
       }
+
+      // --- Clash Detection Engine ---
+      const allSlots = [];
+      schedule.breaks.forEach(br => {
+        br.slots.forEach(slot => {
+          allSlots.push({ ...slot, round: br.roundNumber, slotRef: slot });
+        });
+      });
+
+      const clashes = [];
+      for (let i = 0; i < allSlots.length; i++) {
+        for (let j = i + 1; j < allSlots.length; j++) {
+          const s1 = allSlots[i];
+          const s2 = allSlots[j];
+          if (s1.keluar < s2.masuk && s2.keluar < s1.masuk) {
+            const overlapStart = Math.max(s1.keluar, s2.keluar);
+            const overlapEnd = Math.min(s1.masuk, s2.masuk);
+            if (overlapEnd - overlapStart >= 60) {
+              s1.slotRef.hasClash = true;
+              s2.slotRef.hasClash = true;
+              s1.slotRef.clashWith = s1.slotRef.clashWith || [];
+              s2.slotRef.clashWith = s2.slotRef.clashWith || [];
+
+              if (!s1.slotRef.clashWith.includes(s2.staffName)) s1.slotRef.clashWith.push(s2.staffName);
+              if (!s2.slotRef.clashWith.includes(s1.staffName)) s2.slotRef.clashWith.push(s1.staffName);
+
+              clashes.push({
+                staff1: s1.staffName,
+                staff2: s2.staffName,
+                round1: s1.round,
+                round2: s2.round,
+                start: overlapStart,
+                end: overlapEnd
+              });
+            }
+          }
+        }
+      }
+      schedule.clashes = clashes;
 
       return schedule;
     }
@@ -1284,6 +2027,7 @@
   const State = {
     currentTab: 'schedule',
     scheduleDate: new Date(),
+    shiftFilter: 'pagi', // 'pagi', 'malam', 'all'
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
     editingStaffId: null,
@@ -1312,26 +2056,40 @@
       }
       State.focusTarget = null;
 
+      let filteredStaff = activeStaff;
+      if (State.shiftFilter && State.shiftFilter !== 'all') {
+        filteredStaff = activeStaff.filter(s => (s.shift || 'pagi') === State.shiftFilter);
+      }
+
       // Update header
       document.getElementById('headerDate').textContent = formatDateID(date);
-      document.getElementById('activeCount').textContent = activeStaff.length;
+      document.getElementById('activeCount').textContent = filteredStaff.length;
       document.getElementById('scheduleDate').value = toDateString(date);
 
       const wrapper = document.getElementById('scheduleTableWrapper');
       const footer = document.getElementById('scheduleFooter');
 
-      if (activeStaff.length === 0) {
+      if (!filteredStaff || filteredStaff.length === 0) {
         wrapper.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">🏖️</div>
-            <div class="empty-state-title">Tidak Ada Staff Berkeliling/Aktif</div>
-            <div class="empty-state-text">Semua staff sedang libur atau cuti pada tanggal ini. Buka tab "Jadwal Kehadiran" untuk mengatur status staff.</div>
+            <div class="empty-state-title">Tidak Ada Staff Aktif pada Shift Ini</div>
+            <div class="empty-state-text">Semua staff sedang libur, cuti, atau berada di shift lain. Silakan atur status staff di tab "Kelola Staff & Kehadiran".</div>
           </div>`;
         footer.innerHTML = '';
         return;
       }
 
       const schedule = BreakCalculator.generateSchedule(activeStaff, date);
+      if (!schedule) {
+        wrapper.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-title">Tidak Ada Jadwal Berjalan</div>
+            <div class="empty-state-text">Silakan aktifkan status staff di tab "Kelola Staff & Kehadiran".</div>
+          </div>`;
+        footer.innerHTML = '';
+        return;
+      }
+
       wrapper.innerHTML = this._buildTable(schedule);
       footer.innerHTML = this._buildFooter(schedule);
 
@@ -1351,8 +2109,6 @@
           }
         }
       }
-
-      this._attachInputListeners();
     },
 
     _buildDelaySummaryCard(schedule) {
@@ -1404,14 +2160,76 @@
     },
 
     _buildTable(schedule) {
+      if (!schedule || !schedule.staff || schedule.staff.length === 0) {
+        return `<div class="empty-state">
+                  <div class="empty-state-title">Tidak Ada Staff Aktif pada Shift Ini</div>
+                  <div class="empty-state-text">Silakan atur status staff ke HADIR di tab Kelola Staff & Kehadiran.</div>
+                </div>`;
+      }
       const staff = schedule.staff;
       const N = staff.length;
 
-      let html = '<table class="schedule-table"><thead><tr>';
+      let html = '';
+
+      // Automated Smart Timing Summary Card
+      const shiftTitle = State.shiftFilter === 'malam' ? 'Shift Malam' : (State.shiftFilter === 'pagi' ? 'Shift Pagi' : 'Semua Shift');
+      const firstRound = schedule.breaks[0];
+
+      if (firstRound && firstRound.slots.length > 0) {
+        html += '<div class="auto-timing-card">';
+        html += '  <div class="auto-timing-header">';
+        html += `    <div class="auto-timing-title"><strong>Kalkulasi Waktu Otomatis</strong> — ${N} Staff On-Duty (${shiftTitle})</div>`;
+        html += `    <div class="auto-timing-badge">Jam Mulai Sesi 1: ${formatTime(firstRound.slots[0].keluar)} WIB</div>`;
+        html += '  </div>';
+        html += '  <div class="auto-timing-grid">';
+
+        schedule.breaks.forEach((br, rIdx) => {
+          const firstSlot = br.slots[0];
+          const lastSlot = br.slots[br.slots.length - 1];
+          if (!firstSlot || !lastSlot) return;
+
+          const startT = formatTime(firstSlot.keluar);
+          const endT = formatTime(lastSlot.masuk);
+          const durMin = Math.round(br.defaultDuration / 60);
+
+          let gapNotice = '';
+          if (rIdx < schedule.breaks.length - 1 && schedule.breaks[rIdx + 1].slots.length > 0) {
+            const nextRoundFirstSlot = schedule.breaks[rIdx + 1].slots[0];
+            if (nextRoundFirstSlot) {
+              const gapSec = nextRoundFirstSlot.keluar - lastSlot.masuk;
+              if (gapSec > 60) {
+                gapNotice = ` • Jeda: ${Math.round(gapSec / 60)}m`;
+              }
+            }
+          }
+
+          html += '    <div class="timing-session-chip">';
+          html += `      <div class="chip-title">Break ${br.roundNumber} (Sesi ${br.roundNumber})</div>`;
+          html += `      <div class="chip-time">${startT} - ${endT}</div>`;
+          html += `      <div class="chip-detail">${N} Staff × ${durMin}m per staff${gapNotice}</div>`;
+          html += '    </div>';
+        });
+
+        html += '  </div>';
+        html += '</div>';
+      }
+
+      // Clash Warning Alert Banner
+      if (schedule.clashes && schedule.clashes.length > 0) {
+        html += `<div class="clash-alert-banner">`;
+        html += `<div class="clash-alert-header">⚠️ DITEMUKAN ${schedule.clashes.length} BENTROK JADWAL BREAK</div>`;
+        html += `<div class="clash-alert-body">`;
+        schedule.clashes.forEach(c => {
+          html += `<div class="clash-item"><strong>${this._escHtml(c.staff1)}</strong> (Break ${c.round1}) &amp; <strong>${this._escHtml(c.staff2)}</strong> (Break ${c.round2}) <span class="clash-time">Waktu bentrok: ${formatTime(c.start)} - ${formatTime(c.end)}</span></div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      html += '<table class="schedule-table"><thead><tr>';
       html += '<th class="break-col">BREAK</th>';
       html += '<th class="label-col">ROW</th>';
       staff.forEach(s => {
-        html += `<th class="staff-col" data-staff-id="${s.id}">${this._escHtml(s.name)}</th>`;
+        html += `<th class="staff-col" data-staff-id="${s.id}" title="Shift: ${s.shift === 'malam' ? 'Malam' : 'Pagi'}">${this._escHtml(s.name)}</th>`;
       });
       html += '<th class="status-col">STATUS</th>';
       html += '</tr></thead><tbody>';
@@ -1439,11 +2257,11 @@
         html += `<div class="break-block-title">BREAK ${br.roundNumber}</div>`;
         html += `<div class="break-block-default">Default: ${formatDuration(br.defaultDuration)}</div>`;
         if (isActiveBlock) {
-          html += `<div class="live-block-badge">⚡ SEDANG BERJALAN</div>`;
+          html += `<div class="live-block-badge">SEDANG BERJALAN</div>`;
         }
-        html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">🔄 Reset</button>`;
+        html += `<button type="button" class="btn-reset-round" data-round="${br.roundNumber}" title="Reset jam dan durasi Break ${br.roundNumber} ke default">Reset</button>`;
         html += `</div></td>`;
-        html += '<td class="label-cell">⏱️ DURASI</td>';
+        html += '<td class="label-cell">DURASI</td>';
 
         br.slots.forEach(slot => {
           html += '<td class="time-cell durasi-cell">';
@@ -1477,7 +2295,7 @@
 
         // 2. MATIKAN LC row
         html += `<tr class="row-matikan ${activeClass}">`;
-        html += '<td class="label-cell">🔴 MATIKAN LC</td>';
+        html += '<td class="label-cell">MATIKAN LC</td>';
         br.slots.forEach(slot => {
           html += `<td class="time-cell matikan-cell">${formatTime(slot.matikanLC)}</td>`;
         });
@@ -1485,23 +2303,28 @@
 
         // 3. KELUAR row
         html += `<tr class="row-keluar ${activeClass}">`;
-        html += '<td class="label-cell">🚶 KELUAR</td>';
+        html += '<td class="label-cell">KELUAR</td>';
         br.slots.forEach(slot => {
-          html += '<td class="time-cell keluar-cell">';
-          html += `<input type="text" maxlength="8" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''}" `;
+          const clashClass = slot.hasClash ? 'has-clash-cell' : '';
+          const inputClash = slot.hasClash ? 'has-clash' : '';
+          const clashTitle = slot.hasClash ? ` ⚠️ BENTROK JAM BREAK: Bersamaan dengan ${slot.clashWith ? slot.clashWith.join(', ') : ''}` : '';
+          html += `<td class="time-cell keluar-cell ${clashClass}">`;
+          html += `<input type="text" maxlength="8" class="time-input keluar-input ${slot.isKeluarOverride ? 'is-override' : ''} ${inputClash}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="keluar" `;
-          html += `value="${formatTime(slot.keluar)}" placeholder="00:00:00" title="Klik atau paste jam keluar ${this._escHtml(slot.staffName)}">`;
+          html += `value="${formatTime(slot.keluar)}" placeholder="00:00:00" title="Jam keluar ${this._escHtml(slot.staffName)}${clashTitle}">`;
           html += '</td>';
         });
         html += '</tr>';
 
         // 4. MASUK row
         html += `<tr class="row-masuk ${activeClass}">`;
-        html += '<td class="label-cell">✅ MASUK</td>';
+        html += '<td class="label-cell">MASUK</td>';
         br.slots.forEach(slot => {
           let inputClass = 'time-input masuk-input';
           if (slot.isExceeded) inputClass += ' is-exceeded';
           else if (slot.isMasukOverride) inputClass += ' is-override';
+          if (slot.hasClash) inputClass += ' has-clash';
+          const clashClass = slot.hasClash ? 'has-clash-cell' : '';
 
           // Calculate actual elapsed duration (from KELUAR to MASUK)
           const actualSecs = Math.max(0, slot.actualDuration || (slot.masuk - slot.keluar));
@@ -1514,11 +2337,12 @@
 
           const durTargetStr = formatDuration(slot.chosenDuration);
 
+          const clashMsg = slot.hasClash ? ` | ⚠️ BENTROK dengan ${slot.clashWith ? slot.clashWith.join(', ') : ''}` : '';
           const titleMsg = slot.isExceeded
-            ? `⚠️ CS ${this._escHtml(slot.staffName)}: Terpakai ${actualDurStr} (Target: ${durTargetStr}) - Melebihi target!`
-            : `CS ${this._escHtml(slot.staffName)} | Durasi Terpakai: ${actualDurStr} (Target: ${durTargetStr})`;
+            ? `⚠️ CS ${this._escHtml(slot.staffName)}: Terpakai ${actualDurStr} (Target: ${durTargetStr}) - Melebihi target!${clashMsg}`
+            : `CS ${this._escHtml(slot.staffName)} | Durasi Terpakai: ${actualDurStr} (Target: ${durTargetStr})${clashMsg}`;
 
-          html += `<td class="time-cell masuk-cell" data-duration="⏱️ ${actualDurStr}" title="${titleMsg}">`;
+          html += `<td class="time-cell masuk-cell ${clashClass}" data-duration="${actualDurStr}" title="${titleMsg}">`;
           html += `<input type="text" maxlength="8" class="${inputClass}" `;
           html += `data-staff-id="${slot.staffId}" data-round="${br.roundNumber}" data-type="masuk" `;
           html += `value="${formatTime(slot.masuk)}" placeholder="00:00:00" title="${titleMsg}">`;
@@ -1586,6 +2410,7 @@
     },
 
     _buildFooter(schedule) {
+      if (!schedule || !schedule.staff || schedule.staff.length === 0 || !schedule.breaks || schedule.breaks.length === 0) return '';
       const N = schedule.staffCount;
       const durations = schedule.durations;
       const lastBreak = schedule.breaks[MAX_BREAK_COUNT - 1];
@@ -1596,12 +2421,12 @@
 
       let html = '';
       html += `<p>Total CS yang bertugas hari ini adalah <strong>${N} orang</strong>. Mohon kerjasamanya untuk mematuhi tabel jadwal di atas demi kenyamanan bersama.</p>`;
-      html += `<p>🔄 <strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
+      html += `<p><strong>Rotasi Harian Otomatis:</strong> Urutan break berotasi otomatis setiap hari (staff urutan pertama hari ini bergeser ke posisi paling belakang esok harinya).</p>`;
       html += `<p>Terdapat 4 variasi durasi break: <strong>${durList}</strong> (sudah termasuk toleransi 1 menit).</p>`;
       html += `<p>Jadwal break berjalan berurutan dan baru berhenti hingga CS ke istirahat terakhir selesai pukul <strong>${endTime} WIB</strong>.</p>`;
 
       if (N <= 7) {
-        html += `<p style="color:var(--green)">✅ Semua break berdurasi 21 menit (20 menit break + 1 menit toleransi) karena jumlah staff ≤ 7 orang.</p>`;
+        html += `<p style="color:var(--green)">Semua break berdurasi 21 menit (20 menit break + 1 menit toleransi) karena jumlah staff ≤ 7 orang.</p>`;
       }
 
       return html;
@@ -1628,7 +2453,6 @@
       if (staff.length === 0) {
         list.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">👥</div>
             <div class="empty-state-title">Belum ada staff</div>
             <div class="empty-state-text">Tambahkan staff baru menggunakan form di atas.</div>
           </div>`;
@@ -1636,15 +2460,37 @@
       }
 
       let html = '';
+      const activeDate = State.scheduleDate || new Date();
+
       staff.forEach((s, idx) => {
-        html += `<div class="staff-item" data-id="${s.id}">`;
+        const shiftType = s.shift || 'pagi';
+        const status = AttendanceManager.getStatus(s.id, activeDate); // 'masuk', 'libur', 'cuti'
+
+        html += `<div class="staff-item" data-id="${s.id}" draggable="true">`;
+        html += `  <span class="drag-handle" title="Tarik / geser untuk mengubah urutan">⋮⋮</span>`;
         html += `  <span class="staff-order">${idx + 1}</span>`;
         html += `  <span class="staff-name">${this._escHtml(s.name)}</span>`;
+        
+        html += '  <div class="staff-controls-container">';
+        // Status Kehadiran Selector (HADIR | LIBUR | CUTI)
+        html += '    <div class="status-btn-group">';
+        html += `      <button type="button" class="btn-status-pill ${status === 'masuk' ? 'active-hadir' : ''}" data-action="set-status" data-status="masuk" data-id="${s.id}" title="Set status Hadir untuk hari ini">HADIR</button>`;
+        html += `      <button type="button" class="btn-status-pill ${status === 'libur' ? 'active-libur' : ''}" data-action="set-status" data-status="libur" data-id="${s.id}" title="Set status Libur untuk hari ini">LIBUR</button>`;
+        html += `      <button type="button" class="btn-status-pill ${status === 'cuti' ? 'active-cuti' : ''}" data-action="set-status" data-status="cuti" data-id="${s.id}" title="Set status Cuti untuk hari ini">CUTI</button>`;
+        html += '    </div>';
+
+        // Shift Selector (PAGI | MALAM)
+        html += '    <div class="shift-btn-group">';
+        html += `      <button type="button" class="btn-shift-pill ${shiftType === 'pagi' ? 'active-pagi' : ''}" data-action="set-shift" data-shift="pagi" data-id="${s.id}" title="Set Shift Pagi">PAGI</button>`;
+        html += `      <button type="button" class="btn-shift-pill ${shiftType === 'malam' ? 'active-malam' : ''}" data-action="set-shift" data-shift="malam" data-id="${s.id}" title="Set Shift Malam">MALAM</button>`;
+        html += '    </div>';
+        html += '  </div>';
+
         html += '  <div class="staff-actions">';
         html += `    <button class="btn-action up" data-action="up" data-id="${s.id}" title="Pindah ke atas"${idx === 0 ? ' disabled style="opacity:0.3"' : ''}>▲</button>`;
         html += `    <button class="btn-action down" data-action="down" data-id="${s.id}" title="Pindah ke bawah"${idx === staff.length - 1 ? ' disabled style="opacity:0.3"' : ''}>▼</button>`;
-        html += `    <button class="btn-action edit" data-action="edit" data-id="${s.id}" title="Edit nama">✏️</button>`;
-        html += `    <button class="btn-action delete" data-action="delete" data-id="${s.id}" title="Hapus staff">🗑️</button>`;
+        html += `    <button class="btn-action edit" data-action="edit" data-id="${s.id}" title="Edit nama">Edit</button>`;
+        html += `    <button class="btn-action delete" data-action="delete" data-id="${s.id}" title="Hapus staff">Hapus</button>`;
         html += '  </div>';
         html += '</div>';
       });
@@ -1763,6 +2609,7 @@
       StaffManager.init();
       AuthManager.init();
       CloudSync.init();
+      SmartCalculatorUI.init();
       this._setupClock();
       this._setupNavigation();
       this._setupScheduleControls();
@@ -1809,10 +2656,10 @@
 
         const bTitle = `BREAK ${br.roundNumber}\nDefault: ${formatDuration(br.defaultDuration)}`;
 
-        tsv += `${bTitle}\t⏱️ DURASI\t` + br.slots.map(s => formatDuration(s.chosenDuration, true)).join('\t') + `\t${summary.text}\n`;
-        tsv += `\t🔴 MATIKAN LC\t` + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\t\n';
-        tsv += `\t🚶 KELUAR\t` + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\t\n';
-        tsv += `\t✅ MASUK\t` + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\t\n\n';
+        tsv += `${bTitle}\tDURASI\t` + br.slots.map(s => formatDuration(s.chosenDuration, true)).join('\t') + `\t${summary.text}\n`;
+        tsv += `\tMATIKAN LC\t` + br.slots.map(s => formatTime(s.matikanLC)).join('\t') + '\t\n';
+        tsv += `\tKELUAR\t` + br.slots.map(s => formatTime(s.keluar)).join('\t') + '\t\n';
+        tsv += `\tMASUK\t` + br.slots.map(s => formatTime(s.masuk)).join('\t') + '\t\n\n';
       });
 
       // Accumulation row at bottom of TSV
@@ -1875,7 +2722,7 @@
       CalendarRenderer.render();
     },
 
-    /* ---- Clock ---- */
+    /* ---- Clock & Live Monitor ---- */
     _setupClock() {
       const clockEl = document.getElementById('clock');
       const tick = () => {
@@ -1883,10 +2730,99 @@
         const h = String(now.getHours()).padStart(2, '0');
         const m = String(now.getMinutes()).padStart(2, '0');
         const s = String(now.getSeconds()).padStart(2, '0');
-        clockEl.textContent = `${h}:${m}:${s}`;
+        if (clockEl) clockEl.textContent = `${h}:${m}:${s}`;
+        this._updateLiveBreakMonitor();
       };
       tick();
       setInterval(tick, 1000);
+    },
+
+    _updateLiveBreakMonitor() {
+      const activeBox = document.getElementById('liveActiveBreakBox');
+      const upcomingBox = document.getElementById('liveUpcomingBreakBox');
+      if (!activeBox || !upcomingBox) return;
+
+      const date = State.scheduleDate;
+      const isToday = toDateString(date) === toDateString(new Date());
+
+      if (!isToday) {
+        activeBox.innerHTML = '<div class="live-empty-state">Monitor Live aktif untuk tanggal hari ini</div>';
+        upcomingBox.innerHTML = '<div class="live-empty-state">Pilih tanggal "Hari Ini" untuk memantau countdown</div>';
+        return;
+      }
+
+      const activeStaff = AttendanceManager.getActiveStaffForDate(date);
+      if (!activeStaff || activeStaff.length === 0) {
+        activeBox.innerHTML = '<div class="live-empty-state">Tidak ada staff aktif hari ini</div>';
+        upcomingBox.innerHTML = '<div class="live-empty-state">Tidak ada jadwal break</div>';
+        return;
+      }
+
+      const schedule = BreakCalculator.generateSchedule(activeStaff, date);
+      if (!schedule || !schedule.breaks) return;
+
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+      const activeBreaks = [];
+      const warningBreaks = [];
+      const upcomingBreaks = [];
+
+      schedule.breaks.forEach(br => {
+        br.slots.forEach(slot => {
+          if (nowSec >= slot.keluar && nowSec < slot.masuk) {
+            const remSec = slot.masuk - nowSec;
+            activeBreaks.push({ slot, round: br.roundNumber, remSec });
+          } else if (nowSec >= slot.matikanLC && nowSec < slot.keluar) {
+            const remSec = slot.keluar - nowSec;
+            warningBreaks.push({ slot, round: br.roundNumber, remSec });
+          } else if (nowSec < slot.matikanLC) {
+            const startSec = slot.keluar - nowSec;
+            upcomingBreaks.push({ slot, round: br.roundNumber, startSec });
+          }
+        });
+      });
+
+      // Render Active Breaks
+      if (activeBreaks.length > 0) {
+        activeBox.innerHTML = activeBreaks.map(item => `
+          <div class="live-staff-item">
+            <div>
+              <span class="live-staff-name">${item.slot.staffName}</span>
+              <span style="font-size:0.8rem;color:var(--text-muted);margin-left:8px;">Break ${item.round} (${formatTime(item.slot.keluar)} - ${formatTime(item.slot.masuk)})</span>
+            </div>
+            <div class="live-countdown">⏳ ${formatDuration(item.remSec, true)}</div>
+          </div>
+        `).join('');
+      } else {
+        activeBox.innerHTML = '<div class="live-empty-state">Tidak ada staff yang sedang break saat ini</div>';
+      }
+
+      // Render Warning & Upcoming Breaks
+      if (warningBreaks.length > 0) {
+        upcomingBox.innerHTML = warningBreaks.map(item => `
+          <div class="live-staff-item" style="border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08);">
+            <div>
+              <span class="live-staff-name" style="color:var(--amber);">⚠️ ${item.slot.staffName}</span>
+              <span style="font-size:0.8rem;color:var(--amber-dim);margin-left:8px;">SIAP-SIAP MATIKAN LIVECHAT! Break pada ${formatTime(item.slot.keluar)}</span>
+            </div>
+            <div class="live-staff-time" style="color:var(--amber);">Keluar dalam ${formatDuration(item.remSec, false)}</div>
+          </div>
+        `).join('');
+      } else if (upcomingBreaks.length > 0) {
+        const next = upcomingBreaks[0];
+        upcomingBox.innerHTML = `
+          <div class="live-staff-item">
+            <div>
+              <span class="live-staff-name">${next.slot.staffName}</span>
+              <span style="font-size:0.8rem;color:var(--text-muted);margin-left:8px;">Break ${next.round} jam ${formatTime(next.slot.keluar)} (Matikan LC ${formatTime(next.slot.matikanLC)})</span>
+            </div>
+            <div class="live-staff-time">Jadwal berikutnya</div>
+          </div>
+        `;
+      } else {
+        upcomingBox.innerHTML = '<div class="live-empty-state">Semua jadwal break hari ini telah selesai 🎉</div>';
+      }
     },
 
     /* ---- Navigation ---- */
@@ -1923,6 +2859,20 @@
       const nextBtn = document.getElementById('nextDay');
       const todayBtn = document.getElementById('todayBtn');
       const printBtn = document.getElementById('printBtn');
+      const searchInput = document.getElementById('scheduleSearchInput');
+      const shiftFilterGroup = document.getElementById('shiftFilterGroup');
+
+      if (shiftFilterGroup) {
+        shiftFilterGroup.addEventListener('click', (e) => {
+          const btn = e.target.closest('.btn-shift');
+          if (!btn) return;
+          const shiftVal = btn.dataset.shift;
+          State.shiftFilter = shiftVal;
+          shiftFilterGroup.querySelectorAll('.btn-shift').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.refreshSchedule();
+        });
+      }
 
       dateInput.value = toDateString(State.scheduleDate);
 
@@ -1950,6 +2900,55 @@
         window.print();
       });
 
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          const query = searchInput.value.toLowerCase().trim();
+          const table = document.querySelector('#scheduleTableWrapper table');
+          if (!table) return;
+          const ths = table.querySelectorAll('thead th');
+          const trs = table.querySelectorAll('tbody tr');
+
+          if (!query) {
+            table.querySelectorAll('th, td').forEach(el => el.style.opacity = '1');
+            return;
+          }
+
+          const matchedCols = new Set();
+          ths.forEach((th, idx) => {
+            if (idx >= 2 && th.textContent.toLowerCase().includes(query)) {
+              matchedCols.add(idx);
+            }
+          });
+
+          ths.forEach((th, idx) => {
+            if (idx >= 2) {
+              th.style.opacity = (matchedCols.size > 0 && !matchedCols.has(idx)) ? '0.2' : '1';
+            }
+          });
+
+          trs.forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            tds.forEach((td, idx) => {
+              if (idx >= 2) {
+                td.style.opacity = (matchedCols.size > 0 && !matchedCols.has(idx)) ? '0.2' : '1';
+              }
+            });
+          });
+        });
+      }
+
+      const breakStartInput = document.getElementById('customBreakStartTime');
+      if (breakStartInput) {
+        breakStartInput.addEventListener('change', () => {
+          const secs = parseTimeToSeconds(breakStartInput.value);
+          if (secs !== null) {
+            State.customBreakStartTimeSec = secs;
+            showToast(`Jam mulai break disesuaikan ke ${breakStartInput.value} WIB`);
+            this.refreshSchedule();
+          }
+        });
+      }
+
       const copySheetBtn = document.getElementById('copySheetBtn');
       if (copySheetBtn) {
         copySheetBtn.addEventListener('click', () => {
@@ -1961,10 +2960,16 @@
       if (resetAllBtn) {
         resetAllBtn.addEventListener('click', () => {
           AuthManager.requireAuth(() => {
-            if (confirm('Apakah Anda yakin ingin mengembalikan seluruh jadwal hari ini ke default?')) {
+            if (confirm('Apakah Anda yakin ingin mereset seluruh break hari ini ke default?')) {
               BreakOverrideManager.resetAll(State.scheduleDate);
               BreakChoiceManager.resetAll(State.scheduleDate);
               BreakStatusManager.resetAll(State.scheduleDate);
+              SmartTimingManager.resetConfig('pagi');
+              SmartTimingManager.resetConfig('malam');
+              delete State.customBreakStartTimeSec;
+              const startInput = document.getElementById('customBreakStartTime');
+              if (startInput) startInput.value = '08:00';
+              showToast('Seluruh jadwal break hari ini berhasil di-reset ke default!', 'info');
               this.refreshSchedule();
             }
           });
@@ -2124,6 +3129,18 @@
       const form = document.getElementById('addStaffForm');
       const nameInput = document.getElementById('staffName');
       const list = document.getElementById('staffList');
+      const staffSearchInput = document.getElementById('staffSearchInput');
+
+      if (staffSearchInput) {
+        staffSearchInput.addEventListener('input', () => {
+          const q = staffSearchInput.value.toLowerCase().trim();
+          const items = list.querySelectorAll('.staff-item');
+          items.forEach(item => {
+            const text = item.querySelector('.staff-name').textContent.toLowerCase();
+            item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+          });
+        });
+      }
 
       // Add staff form
       form.addEventListener('submit', (e) => {
@@ -2144,6 +3161,112 @@
         });
       });
 
+      // Quick Sort buttons
+      const azBtn = document.getElementById('sortAzBtn');
+      const zaBtn = document.getElementById('sortZaBtn');
+      const defaultBtn = document.getElementById('sortDefaultBtn');
+      const presetNightBtn = document.getElementById('presetNightBtn');
+
+      if (presetNightBtn) {
+        presetNightBtn.addEventListener('click', () => {
+          AuthManager.requireAuth(() => {
+            StaffManager.applyNightPreset(['PAT', 'WIL', 'SUN', 'LID', 'WEN']);
+            showToast('PAT, WIL, SUN, LID, WEN di-set ke Shift Malam 🌙');
+            this.refreshStaff();
+            this.refreshSchedule();
+          });
+        });
+      }
+
+      if (azBtn) {
+        azBtn.addEventListener('click', () => {
+          AuthManager.requireAuth(() => {
+            StaffManager.sortAlphabetical(true);
+            showToast('Urutan staff diubah (A ke Z) 🔤');
+            this.refreshStaff();
+            this.refreshSchedule();
+          });
+        });
+      }
+
+      if (zaBtn) {
+        zaBtn.addEventListener('click', () => {
+          AuthManager.requireAuth(() => {
+            StaffManager.sortAlphabetical(false);
+            showToast('Urutan staff diubah (Z ke A) 🔠');
+            this.refreshStaff();
+            this.refreshSchedule();
+          });
+        });
+      }
+
+      if (defaultBtn) {
+        defaultBtn.addEventListener('click', () => {
+          AuthManager.requireAuth(() => {
+            StaffManager.resetOrderToDefault();
+            showToast('Urutan staff dikembalikan ke default 🔄');
+            this.refreshStaff();
+            this.refreshSchedule();
+          });
+        });
+      }
+
+      // Drag and Drop reordering
+      let draggedItem = null;
+
+      list.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.staff-item');
+        if (!item) return;
+        draggedItem = item;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+      });
+
+      list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const targetItem = e.target.closest('.staff-item');
+        if (targetItem && targetItem !== draggedItem) {
+          list.querySelectorAll('.staff-item').forEach(el => el.classList.remove('drag-over'));
+          targetItem.classList.add('drag-over');
+        }
+      });
+
+      list.addEventListener('dragleave', (e) => {
+        const targetItem = e.target.closest('.staff-item');
+        if (targetItem) targetItem.classList.remove('drag-over');
+      });
+
+      list.addEventListener('drop', (e) => {
+        e.preventDefault();
+        list.querySelectorAll('.staff-item').forEach(el => el.classList.remove('drag-over', 'dragging'));
+        const targetItem = e.target.closest('.staff-item');
+        if (!draggedItem || !targetItem || draggedItem === targetItem) return;
+
+        AuthManager.requireAuth(() => {
+          const items = Array.from(list.querySelectorAll('.staff-item'));
+          const draggedIdx = items.indexOf(draggedItem);
+          const targetIdx = items.indexOf(targetItem);
+
+          if (draggedIdx !== -1 && targetIdx !== -1) {
+            items.splice(draggedIdx, 1);
+            items.splice(targetIdx, 0, draggedItem);
+
+            const newIdOrder = items.map(el => el.dataset.id);
+            StaffManager.reorderByIds(newIdOrder);
+            showToast('Urutan staff berhasil diperbarui!');
+            this.refreshStaff();
+            this.refreshSchedule();
+          }
+        });
+      });
+
+      list.addEventListener('dragend', () => {
+        list.querySelectorAll('.staff-item').forEach(el => el.classList.remove('drag-over', 'dragging'));
+        draggedItem = null;
+      });
+
       // Staff list actions (event delegation)
       list.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
@@ -2154,6 +3277,36 @@
 
         AuthManager.requireAuth(() => {
           switch (action) {
+            case 'set-status':
+              {
+                const targetStatus = btn.dataset.status;
+                const activeDate = State.scheduleDate || new Date();
+                AttendanceManager.setStatus(id, activeDate, targetStatus);
+                const staffObj = StaffManager.getById(id);
+                const statusLabel = targetStatus === 'masuk' ? 'Hadir' : (targetStatus === 'libur' ? 'Libur' : 'Cuti');
+                showToast(`Status ${staffObj ? staffObj.name : ''} diubah ke ${statusLabel}`);
+                this.refreshStaff();
+                this.refreshSchedule();
+              }
+              break;
+            case 'set-shift':
+              {
+                const targetShift = btn.dataset.shift;
+                StaffManager.setShift(id, targetShift);
+                const staffObj = StaffManager.getById(id);
+                showToast(`Shift ${staffObj ? staffObj.name : ''} diubah ke ${targetShift === 'malam' ? 'Malam' : 'Pagi'}`);
+                this.refreshStaff();
+                this.refreshSchedule();
+              }
+              break;
+            case 'toggle-shift':
+              {
+                const newShift = StaffManager.toggleShift(id);
+                showToast(`Shift diubah ke ${newShift === 'malam' ? 'Malam' : 'Pagi'}`);
+                this.refreshStaff();
+                this.refreshSchedule();
+              }
+              break;
             case 'up':
               StaffManager.moveUp(id);
               this.refreshStaff();
@@ -2180,6 +3333,23 @@
       const prevBtn = document.getElementById('prevMonth');
       const nextBtn = document.getElementById('nextMonth');
       const wrapper = document.getElementById('attendanceTableWrapper');
+      const attendanceSearchInput = document.getElementById('attendanceSearchInput');
+
+      if (attendanceSearchInput) {
+        attendanceSearchInput.addEventListener('input', () => {
+          const q = attendanceSearchInput.value.toLowerCase().trim();
+          const table = document.querySelector('#attendanceTableWrapper table');
+          if (!table) return;
+          const trs = table.querySelectorAll('tbody tr');
+          trs.forEach(tr => {
+            const staffNameTd = tr.querySelector('.staff-name-col');
+            if (staffNameTd) {
+              const text = staffNameTd.textContent.toLowerCase();
+              tr.style.display = (!q || text.includes(q)) ? '' : 'none';
+            }
+          });
+        });
+      }
 
       prevBtn.addEventListener('click', () => {
         State.calMonth--;
@@ -2408,7 +3578,8 @@
       State.deletingStaffId = staffId;
       document.getElementById('deleteStaffName').textContent = staff.name;
       document.getElementById('deleteModal').classList.add('show');
-    }
+    },
+
   };
 
   /* ============================================
