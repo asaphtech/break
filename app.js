@@ -55,9 +55,9 @@
     let clean = str.trim().replace(/[.,\s]+/g, ':');
 
     if (/^\d{6}$/.test(clean)) {
-      clean = `${clean.substring(0,2)}:${clean.substring(2,4)}:${clean.substring(4,6)}`;
+      clean = `${clean.substring(0, 2)}:${clean.substring(2, 4)}:${clean.substring(4, 6)}`;
     } else if (/^\d{4}$/.test(clean)) {
-      clean = `${clean.substring(0,2)}:${clean.substring(2,4)}:00`;
+      clean = `${clean.substring(0, 2)}:${clean.substring(2, 4)}:00`;
     }
 
     const parts = clean.split(':');
@@ -140,10 +140,10 @@
         console.warn('Storage write failed:', e);
       }
     },
-    getStaff()         { return this.get('break_scheduler_staff', null); },
-    setStaff(data)     { this.set('break_scheduler_staff', data); },
-    getAttendance(y, m){ return this.get(`break_att_${y}_${String(m+1).padStart(2,'0')}`, {}); },
-    setAttendance(y, m, data){ this.set(`break_att_${y}_${String(m+1).padStart(2,'0')}`, data); },
+    getStaff() { return this.get('break_scheduler_staff', null); },
+    setStaff(data) { this.set('break_scheduler_staff', data); },
+    getAttendance(y, m) { return this.get(`break_att_${y}_${String(m + 1).padStart(2, '0')}`, {}); },
+    setAttendance(y, m, data) { this.set(`break_att_${y}_${String(m + 1).padStart(2, '0')}`, data); },
   };
 
   /* ============================================
@@ -208,10 +208,10 @@
       }
 
       try {
-        let data = null;
+        let rows = [];
 
         if (isSupa) {
-          const res = await fetch(`${supa.url}/rest/v1/break_scheduler_data?key=eq.main_state&select=*`, {
+          const res = await fetch(`${supa.url}/rest/v1/break_scheduler_data?select=*`, {
             headers: {
               'apikey': supa.key,
               'Authorization': `Bearer ${supa.key}`,
@@ -219,36 +219,58 @@
             }
           });
           if (!res.ok) throw new Error('Supabase pull failed');
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows.length > 0) {
-            data = rows[0].value;
-          }
+          rows = await res.json();
         } else {
           const res = await fetch(this.getEndpoint(), {
             headers: { 'Accept': 'application/json' }
           });
           if (!res.ok) throw new Error('Cloud pull failed');
-          data = await res.json();
+          const data = await res.json();
+          if (data) rows = [{ key: 'main_state', value: data }];
         }
 
-        if (data && typeof data === 'object' && Array.isArray(data.staff)) {
-          if (data.password) {
-            this._cloudPassword = data.password;
+        if (Array.isArray(rows) && rows.length > 0) {
+          const dataMap = {};
+          rows.forEach(r => {
+            if (r.key === 'main_state' && r.value) {
+              Object.assign(dataMap, r.value);
+            } else if (r.key && r.value !== undefined) {
+              dataMap[r.key] = r.value;
+            }
+          });
+
+          if (dataMap.settings && dataMap.settings.password) {
+            dataMap.password = dataMap.settings.password;
           }
 
-          const hash = JSON.stringify(data.staff) + JSON.stringify(data.attendance || {}) + JSON.stringify(data.breakChoices || {}) + JSON.stringify(data.breakOverrides || {}) + JSON.stringify(data.breakStatuses || {}) + JSON.stringify(data.password || '');
-          if (hash !== this._lastHash) {
-            this._lastHash = hash;
-            this._mergeState(data);
-            StaffManager.init();
-            if (!isInitial) {
-              const activeTag = document.activeElement ? document.activeElement.tagName : '';
-              if (activeTag !== 'INPUT' && activeTag !== 'SELECT') {
-                App.refreshAll();
+          if (Array.isArray(dataMap.staff)) {
+            if (dataMap.password) {
+              this._cloudPassword = dataMap.password;
+            }
+
+            const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
+            const cloudUpdatedAt = (dataMap.settings && dataMap.settings.updatedAt) || dataMap.updatedAt || '';
+
+            // If local modification timestamp is newer than cloud data timestamp, skip cloud overwrite!
+            if (!isInitial && localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
+              this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
+              return;
+            }
+
+            const hash = JSON.stringify(dataMap.staff) + JSON.stringify(dataMap.attendance || {}) + JSON.stringify(dataMap.breakChoices || {}) + JSON.stringify(dataMap.breakOverrides || {}) + JSON.stringify(dataMap.breakStatuses || {}) + JSON.stringify(dataMap.password || '');
+            if (hash !== this._lastHash) {
+              this._lastHash = hash;
+              this._mergeState(dataMap);
+              StaffManager.init();
+              if (!isInitial) {
+                const activeTag = document.activeElement ? document.activeElement.tagName : '';
+                if (activeTag !== 'INPUT' && activeTag !== 'SELECT') {
+                  App.refreshAll();
+                }
               }
             }
+            this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
           }
-          this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
         }
       } catch (err) {
         console.warn('CloudSync pull error:', err);
@@ -261,7 +283,12 @@
 
     _mergeState(data) {
       if (!data) return;
-      if (Array.isArray(data.staff)) Storage.setStaff(data.staff);
+      if (Array.isArray(data.staff)) {
+        Storage.setStaff(data.staff);
+        if (typeof StaffManager !== 'undefined') {
+          StaffManager._staff = data.staff;
+        }
+      }
       if (data.attendance) Storage.set('break_scheduler_attendance', data.attendance);
       if (data.password) Storage.set('break_scheduler_admin_pass', data.password);
       if (data.breakChoices) {
@@ -306,11 +333,11 @@
 
         const staff = StaffManager.getAll();
         let password = AuthManager.getPassword();
-        
+
         if (password === '1234' && !Storage.get('break_scheduler_pass_custom', false) && this._cloudPassword) {
           password = this._cloudPassword;
         }
-        
+
         const attendance = {};
         const breakChoices = {};
         const breakOverrides = {};
@@ -345,6 +372,15 @@
 
         let res;
         if (isSupa) {
+          const supaRows = [
+            { key: 'staff', value: staff, updated_at: nowIso },
+            { key: 'settings', value: { password, updatedAt: nowIso }, updated_at: nowIso },
+            { key: 'attendance', value: attendance, updated_at: nowIso },
+            { key: 'breakChoices', value: breakChoices, updated_at: nowIso },
+            { key: 'breakOverrides', value: breakOverrides, updated_at: nowIso },
+            { key: 'breakStatuses', value: breakStatuses, updated_at: nowIso }
+          ];
+
           res = await fetch(`${supa.url}/rest/v1/break_scheduler_data`, {
             method: 'POST',
             headers: {
@@ -353,11 +389,7 @@
               'Content-Type': 'application/json',
               'Prefer': 'resolution=merge-duplicates'
             },
-            body: JSON.stringify([{
-              key: 'main_state',
-              value: payload,
-              updated_at: nowIso
-            }])
+            body: JSON.stringify(supaRows)
           });
         } else {
           res = await fetch(this.getEndpoint(), {
@@ -372,7 +404,7 @@
 
         if (res.ok) {
           this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
-          if (!silent) showToast(isSupa ? 'Data tersimpan ke Supabase! ⚡' : 'Data tersinkronisasi ke Cloud! ☁️', 'success');
+          if (!silent) showToast(isSupa ? 'Data tersimpan ke Supabase!' : 'Data tersinkronisasi ke Cloud!', 'success');
         } else {
           throw new Error('Push failed');
         }
@@ -1437,7 +1469,7 @@
         html += `  <td><span class="round-badge-tag">Ronde ${rd.roundNumber}</span></td>`;
         html += `  <td><strong>${rd.durMin} Mins</strong></td>`;
         html += `  <td>${formatHoursMinutes(rd.roundTotalSec)}</td>`;
-        html += `  <td><span class="time-mono">${startT.substring(0,5)} - ${endT.substring(0,5)}</span></td>`;
+        html += `  <td><span class="time-mono">${startT.substring(0, 5)} - ${endT.substring(0, 5)}</span></td>`;
         html += `</tr>`;
       });
 
@@ -1508,13 +1540,13 @@
       res.roundDetails.forEach((rd, idx) => {
         const pR = (rd.roundTotalSec / totalSec) * 100;
         const breakClass = `seg-break-${(idx % 4) + 1}`;
-        html += `<div class="timeline-seg ${breakClass}" style="width:${pR.toFixed(2)}%;" title="Sesi Break Ronde ${rd.roundNumber}: ${formatTime(rd.roundStartSec).substring(0,5)} - ${formatTime(rd.roundEndSec % 86400).substring(0,5)} (${res.staffCount} CS × ${rd.durMin}m)">Break ${rd.roundNumber}</div>`;
+        html += `<div class="timeline-seg ${breakClass}" style="width:${pR.toFixed(2)}%;" title="Sesi Break Ronde ${rd.roundNumber}: ${formatTime(rd.roundStartSec).substring(0, 5)} - ${formatTime(rd.roundEndSec % 86400).substring(0, 5)} (${res.staffCount} CS × ${rd.durMin}m)">Break ${rd.roundNumber}</div>`;
 
         if (idx < res.intervals.interRoundIntervals.length) {
           const gapSec = res.intervals.interRoundIntervals[idx].roundGapSec;
           const pGap = (gapSec / totalSec) * 100;
           if (pGap > 0) {
-            html += `<div class="timeline-seg seg-work" style="width:${pGap.toFixed(2)}%;" title="Jarak Kerja B${idx+1} ➔ B${idx+2}: ${formatHoursMinutes(gapSec)}">Jarak R${idx+1}-R${idx+2}</div>`;
+            html += `<div class="timeline-seg seg-work" style="width:${pGap.toFixed(2)}%;" title="Jarak Kerja B${idx + 1} ➔ B${idx + 2}: ${formatHoursMinutes(gapSec)}">Jarak R${idx + 1}-R${idx + 2}</div>`;
           }
         }
       });
@@ -1724,14 +1756,14 @@
       let text = `🧠 RINGKASAN KALKULASI PINTAR BREAK STAFF\n`;
       text += `--------------------------------------------------\n`;
       text += `👥 Jumlah Staff Aktif : ${res.staffCount} CS\n`;
-      text += `⏰ Jam Shift Kerja    : ${formatTime(res.shiftStartSec).substring(0,5)} - ${formatTime(res.shiftEndSec % 86400).substring(0,5)} (${formatHoursMinutes(res.totalShiftSec)})\n`;
-      text += `🎯 Akhir Sesi Ronde 4 : ${formatTime(res.finalBreakEndSec % 86400).substring(0,5)} WIB (${res.isFinishExact ? 'Pas Tepat Shift' : 'Buffer'})\n`;
+      text += `⏰ Jam Shift Kerja    : ${formatTime(res.shiftStartSec).substring(0, 5)} - ${formatTime(res.shiftEndSec % 86400).substring(0, 5)} (${formatHoursMinutes(res.totalShiftSec)})\n`;
+      text += `🎯 Akhir Sesi Ronde 4 : ${formatTime(res.finalBreakEndSec % 86400).substring(0, 5)} WIB (${res.isFinishExact ? 'Pas Tepat Shift' : 'Buffer'})\n`;
       text += `⏱️ Total Break/Staff  : ${Math.round(res.totalBreakSecPerStaff / 60)} Menit (${res.roundsCount} Sesi Ronde)\n`;
       text += `💼 Kerja Efektif/Staff: ${formatHoursMinutes(res.totalNetWorkSecPerStaff)}\n\n`;
 
       text += `🎯 RINCIAN DURASI BREAK PER RONDE:\n`;
       res.roundDetails.forEach(rd => {
-        text += `  • Ronde ${rd.roundNumber} : ${rd.durMin} Menit per CS (Sesi: ${formatTime(rd.roundStartSec).substring(0,5)} - ${formatTime(rd.roundEndSec % 86400).substring(0,5)})\n`;
+        text += `  • Ronde ${rd.roundNumber} : ${rd.durMin} Menit per CS (Sesi: ${formatTime(rd.roundStartSec).substring(0, 5)} - ${formatTime(rd.roundEndSec % 86400).substring(0, 5)})\n`;
       });
 
       text += `\n📏 RINCIAN JARAK DURASI KERJA & ESTAFET:\n`;
@@ -2451,6 +2483,8 @@
       const list = document.getElementById('staffList');
       const badge = document.getElementById('staffCountBadge');
 
+      if (!list) return;
+
       badge.textContent = `${staff.length} staff`;
 
       if (staff.length === 0) {
@@ -2462,42 +2496,92 @@
         return;
       }
 
-      let html = '';
       const activeDate = State.scheduleDate || new Date();
+
+      const groups = {
+        pagi: [],
+        malam: [],
+        libur: [],
+        cuti: []
+      };
 
       staff.forEach((s, idx) => {
         const shiftType = s.shift || 'pagi';
         const status = AttendanceManager.getStatus(s.id, activeDate); // 'masuk', 'libur', 'cuti'
+        const itemData = { s, idx, shiftType, status };
 
-        html += `<div class="staff-item" data-id="${s.id}" draggable="true">`;
-        html += `  <span class="drag-handle" title="Tarik / geser untuk mengubah urutan">⋮⋮</span>`;
-        html += `  <span class="staff-order">${idx + 1}</span>`;
-        html += `  <span class="staff-name">${this._escHtml(s.name)}</span>`;
-        
-        html += '  <div class="staff-controls-container">';
-        // Status Kehadiran Selector (HADIR | LIBUR | CUTI)
-        html += '    <div class="status-btn-group">';
-        html += `      <button type="button" class="btn-status-pill ${status === 'masuk' ? 'active-hadir' : ''}" data-action="set-status" data-status="masuk" data-id="${s.id}" title="Set status Hadir untuk hari ini">HADIR</button>`;
-        html += `      <button type="button" class="btn-status-pill ${status === 'libur' ? 'active-libur' : ''}" data-action="set-status" data-status="libur" data-id="${s.id}" title="Set status Libur untuk hari ini">LIBUR</button>`;
-        html += `      <button type="button" class="btn-status-pill ${status === 'cuti' ? 'active-cuti' : ''}" data-action="set-status" data-status="cuti" data-id="${s.id}" title="Set status Cuti untuk hari ini">CUTI</button>`;
-        html += '    </div>';
-
-        // Shift Selector (PAGI | MALAM)
-        html += '    <div class="shift-btn-group">';
-        html += `      <button type="button" class="btn-shift-pill ${shiftType === 'pagi' ? 'active-pagi' : ''}" data-action="set-shift" data-shift="pagi" data-id="${s.id}" title="Set Shift Pagi">PAGI</button>`;
-        html += `      <button type="button" class="btn-shift-pill ${shiftType === 'malam' ? 'active-malam' : ''}" data-action="set-shift" data-shift="malam" data-id="${s.id}" title="Set Shift Malam">MALAM</button>`;
-        html += '    </div>';
-        html += '  </div>';
-
-        html += '  <div class="staff-actions">';
-        html += `    <button class="btn-action up" data-action="up" data-id="${s.id}" title="Pindah ke atas"${idx === 0 ? ' disabled style="opacity:0.3"' : ''}>▲</button>`;
-        html += `    <button class="btn-action down" data-action="down" data-id="${s.id}" title="Pindah ke bawah"${idx === staff.length - 1 ? ' disabled style="opacity:0.3"' : ''}>▼</button>`;
-        html += `    <button class="btn-action edit" data-action="edit" data-id="${s.id}" title="Edit nama">Edit</button>`;
-        html += `    <button class="btn-action delete" data-action="delete" data-id="${s.id}" title="Hapus staff">Hapus</button>`;
-        html += '  </div>';
-        html += '</div>';
+        if (status === 'libur') {
+          groups.libur.push(itemData);
+        } else if (status === 'cuti') {
+          groups.cuti.push(itemData);
+        } else if (shiftType === 'malam') {
+          groups.malam.push(itemData);
+        } else {
+          groups.pagi.push(itemData);
+        }
       });
 
+      const categories = [
+        { key: 'pagi', label: 'PAGI', icon: '☀️', class: 'group-pagi', count: groups.pagi.length },
+        { key: 'malam', label: 'MALAM', icon: '🌙', class: 'group-malam', count: groups.malam.length },
+        { key: 'libur', label: 'LIBUR', icon: '🏖️', class: 'group-libur', count: groups.libur.length },
+        { key: 'cuti', label: 'CUTI', icon: '📋', class: 'group-cuti', count: groups.cuti.length }
+      ];
+
+      let html = '<div class="staff-groups-container">';
+
+      categories.forEach(cat => {
+        const items = groups[cat.key];
+
+        html += `<div class="staff-group-section ${cat.class}" data-group="${cat.key}">`;
+        html += `  <div class="staff-group-header">`;
+        html += `    <div class="staff-group-title">`;
+        html += `      <span class="staff-group-icon">${cat.icon}</span>`;
+        html += `      <span class="staff-group-name">${cat.label}</span>`;
+        html += `      <span class="staff-group-badge">${cat.count} staff</span>`;
+        html += `    </div>`;
+        html += `  </div>`;
+        html += `  <div class="staff-group-body">`;
+
+        if (items.length === 0) {
+          html += `    <div class="staff-group-empty">Tidak ada staff di kategori ini</div>`;
+        } else {
+          items.forEach(({ s, idx, shiftType, status }) => {
+            html += `<div class="staff-item" data-id="${s.id}" draggable="true">`;
+            html += `  <span class="drag-handle" title="Tarik / geser untuk mengubah urutan">⋮⋮</span>`;
+            html += `  <span class="staff-order">${idx + 1}</span>`;
+            html += `  <span class="staff-name">${this._escHtml(s.name)}</span>`;
+
+            html += '  <div class="staff-controls-container">';
+            // Status Kehadiran Selector (HADIR | LIBUR | CUTI)
+            html += '    <div class="status-btn-group">';
+            html += `      <button type="button" class="btn-status-pill ${status === 'masuk' ? 'active-hadir' : ''}" data-action="set-status" data-status="masuk" data-id="${s.id}" title="Set status Hadir untuk hari ini">HADIR</button>`;
+            html += `      <button type="button" class="btn-status-pill ${status === 'libur' ? 'active-libur' : ''}" data-action="set-status" data-status="libur" data-id="${s.id}" title="Set status Libur untuk hari ini">LIBUR</button>`;
+            html += `      <button type="button" class="btn-status-pill ${status === 'cuti' ? 'active-cuti' : ''}" data-action="set-status" data-status="cuti" data-id="${s.id}" title="Set status Cuti untuk hari ini">CUTI</button>`;
+            html += '    </div>';
+
+            // Shift Selector (PAGI | MALAM)
+            html += '    <div class="shift-btn-group">';
+            html += `      <button type="button" class="btn-shift-pill ${shiftType === 'pagi' ? 'active-pagi' : ''}" data-action="set-shift" data-shift="pagi" data-id="${s.id}" title="Set Shift Pagi">PAGI</button>`;
+            html += `      <button type="button" class="btn-shift-pill ${shiftType === 'malam' ? 'active-malam' : ''}" data-action="set-shift" data-shift="malam" data-id="${s.id}" title="Set Shift Malam">MALAM</button>`;
+            html += '    </div>';
+            html += '  </div>';
+
+            html += '  <div class="staff-actions">';
+            html += `    <button class="btn-action up" data-action="up" data-id="${s.id}" title="Pindah ke atas"${idx === 0 ? ' disabled style="opacity:0.3"' : ''}>▲</button>`;
+            html += `    <button class="btn-action down" data-action="down" data-id="${s.id}" title="Pindah ke bawah"${idx === staff.length - 1 ? ' disabled style="opacity:0.3"' : ''}>▼</button>`;
+            html += `    <button class="btn-action edit" data-action="edit" data-id="${s.id}" title="Edit nama">Edit</button>`;
+            html += `    <button class="btn-action delete" data-action="delete" data-id="${s.id}" title="Hapus staff">Hapus</button>`;
+            html += '  </div>';
+            html += '</div>';
+          });
+        }
+
+        html += `  </div>`;
+        html += `</div>`;
+      });
+
+      html += '</div>';
       list.innerHTML = html;
     },
 
@@ -2564,9 +2648,9 @@
           const extraClass = isWeekend ? ' weekend-col' : '';
 
           html += `<td class="attendance-cell ${status}${extraClass}" `
-                + `data-staff-id="${s.id}" data-day="${d}" `
-                + `title="${s.name} — ${d} ${MONTHS_ID[month]}: ${STATUS_LABELS[status]}">`
-                + `${icon}</td>`;
+            + `data-staff-id="${s.id}" data-day="${d}" `
+            + `title="${s.name} — ${d} ${MONTHS_ID[month]}: ${STATUS_LABELS[status]}">`
+            + `${icon}</td>`;
         }
         html += '</tr>';
       });
@@ -3141,6 +3225,15 @@
           items.forEach(item => {
             const text = item.querySelector('.staff-name').textContent.toLowerCase();
             item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+          });
+
+          const sections = list.querySelectorAll('.staff-group-section');
+          sections.forEach(sec => {
+            const visibleItems = sec.querySelectorAll('.staff-item:not([style*="display: none"])');
+            const emptyEl = sec.querySelector('.staff-group-empty');
+            if (emptyEl) {
+              emptyEl.style.display = (visibleItems.length === 0) ? 'block' : 'none';
+            }
           });
         });
       }
