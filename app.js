@@ -44,9 +44,11 @@
   }
 
   function formatTime(totalSeconds) {
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = Math.round(totalSeconds % 60);
+    if (totalSeconds === null || totalSeconds === undefined || isNaN(totalSeconds)) return '00:00:00';
+    const secsInDay = ((Math.round(totalSeconds) % 86400) + 86400) % 86400;
+    const h = Math.floor(secsInDay / 3600);
+    const m = Math.floor((secsInDay % 3600) / 60);
+    const s = secsInDay % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
@@ -1967,9 +1969,15 @@
             r + 1
           );
 
-          const keluar = (override.keluar !== undefined) ? override.keluar : currentPointer;
+          let keluar = (override.keluar !== undefined) ? override.keluar : currentPointer;
+          if (currentShift === 'malam' && override.keluar !== undefined && override.keluar < 43200) {
+            keluar += 86400;
+          }
           const matikanLC = keluar - LC_OFFSET;
-          const masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
+          let masuk = (override.masuk !== undefined) ? override.masuk : (keluar + chosenDuration);
+          if (currentShift === 'malam' && override.masuk !== undefined && override.masuk < 43200 && masuk < keluar) {
+            masuk += 86400;
+          }
           const isCompleted = BreakStatusManager.isCompleted(targetDate, staff.id, r + 1);
           const actualDuration = masuk - keluar;
 
