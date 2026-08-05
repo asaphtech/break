@@ -140,6 +140,20 @@
         console.warn('Storage write failed:', e);
       }
     },
+    remove(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        console.warn('Storage remove failed:', e);
+      }
+    },
+    touch() {
+      const nowIso = new Date().toISOString();
+      this.set('break_scheduler_updated_at', nowIso);
+      if (typeof CloudSync !== 'undefined' && CloudSync.markLocalChange) {
+        CloudSync.markLocalChange(nowIso);
+      }
+    },
     getStaff() { return this.get('break_scheduler_staff', null); },
     setStaff(data) { this.set('break_scheduler_staff', data); },
     getAttendance(y, m) { return this.get(`break_att_${y}_${String(m + 1).padStart(2, '0')}`, {}); },
@@ -163,6 +177,36 @@
       this.pullData(true).then(() => {
         this.startAutoPoll();
       });
+    },
+
+    markLocalChange(isoTime) {
+      const nowIso = isoTime || new Date().toISOString();
+      Storage.set('break_scheduler_updated_at', nowIso);
+      this._initialPullCompleted = true;
+      this.computeCurrentHash();
+      this.debouncePushData();
+    },
+
+    computeCurrentHash() {
+      const staff = typeof StaffManager !== 'undefined' ? StaffManager.getAll() : (Storage.getStaff() || []);
+      const password = typeof AuthManager !== 'undefined' ? AuthManager.getPassword() : Storage.get('break_scheduler_pass', '1234');
+      const attendance = {};
+      const breakChoices = {};
+      const breakOverrides = {};
+      const breakStatuses = {};
+      const smartTimings = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('break_att_')) attendance[key] = Storage.get(key, {});
+        if (key && key.startsWith('break_choice_')) breakChoices[key] = Storage.get(key, {});
+        if (key && key.startsWith('break_override_')) breakOverrides[key] = Storage.get(key, {});
+        if (key && key.startsWith('break_status_')) breakStatuses[key] = Storage.get(key, {});
+        if (key && key.startsWith('break_smart_timing_')) smartTimings[key] = Storage.get(key, {});
+      }
+      const baseDate = Storage.get('break_scheduler_base_date', '');
+      const hash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides) + JSON.stringify(breakStatuses) + JSON.stringify(smartTimings) + JSON.stringify(baseDate) + JSON.stringify(password || '');
+      this._lastHash = hash;
+      return hash;
     },
 
     getSupabaseConfig() {
@@ -231,13 +275,18 @@
 
         if (Array.isArray(rows) && rows.length > 0) {
           const dataMap = {};
+          // Collect specific key rows first, ignoring legacy main_state
           rows.forEach(r => {
-            if (r.key === 'main_state' && r.value) {
-              Object.assign(dataMap, r.value);
-            } else if (r.key && r.value !== undefined) {
+            if (r.key && r.key !== 'main_state' && r.value !== undefined) {
               dataMap[r.key] = r.value;
             }
           });
+
+          // Only fallback to main_state if staff is not present in dataMap
+          const mainRow = rows.find(r => r.key === 'main_state');
+          if (mainRow && mainRow.value && (!dataMap.staff || !Array.isArray(dataMap.staff))) {
+            Object.assign(dataMap, mainRow.value);
+          }
 
           if (dataMap.settings && dataMap.settings.password) {
             dataMap.password = dataMap.settings.password;
@@ -251,13 +300,13 @@
             const localUpdatedAt = Storage.get('break_scheduler_updated_at', '');
             const cloudUpdatedAt = (dataMap.settings && dataMap.settings.updatedAt) || dataMap.updatedAt || '';
 
-            // If local modification timestamp is newer than cloud data timestamp, skip cloud overwrite!
-            if (!isInitial && localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) > new Date(cloudUpdatedAt)) {
+            // If local modification timestamp is newer than or equal to cloud data timestamp, skip cloud overwrite!
+            if (!isInitial && localUpdatedAt && cloudUpdatedAt && new Date(localUpdatedAt) >= new Date(cloudUpdatedAt)) {
               this.updateBadge('online', isSupa ? 'Supabase Live' : 'Cloud Live');
               return;
             }
 
-            const hash = JSON.stringify(dataMap.staff) + JSON.stringify(dataMap.attendance || {}) + JSON.stringify(dataMap.breakChoices || {}) + JSON.stringify(dataMap.breakOverrides || {}) + JSON.stringify(dataMap.breakStatuses || {}) + JSON.stringify(dataMap.password || '');
+            const hash = JSON.stringify(dataMap.staff) + JSON.stringify(dataMap.attendance || {}) + JSON.stringify(dataMap.breakChoices || {}) + JSON.stringify(dataMap.breakOverrides || {}) + JSON.stringify(dataMap.breakStatuses || {}) + JSON.stringify(dataMap.smartTimings || {}) + JSON.stringify(dataMap.baseDate || '') + JSON.stringify(dataMap.password || '');
             if (hash !== this._lastHash) {
               this._lastHash = hash;
               this._mergeState(dataMap);
@@ -289,7 +338,9 @@
           StaffManager._staff = data.staff;
         }
       }
-      if (data.attendance) Storage.set('break_scheduler_attendance', data.attendance);
+      if (data.attendance) {
+        Object.keys(data.attendance).forEach(key => Storage.set(key, data.attendance[key]));
+      }
       if (data.password) Storage.set('break_scheduler_admin_pass', data.password);
       if (data.breakChoices) {
         Object.keys(data.breakChoices).forEach(key => Storage.set(key, data.breakChoices[key]));
@@ -299,6 +350,12 @@
       }
       if (data.breakStatuses) {
         Object.keys(data.breakStatuses).forEach(key => Storage.set(key, data.breakStatuses[key]));
+      }
+      if (data.smartTimings) {
+        Object.keys(data.smartTimings).forEach(key => Storage.set(key, data.smartTimings[key]));
+      }
+      if (data.baseDate) {
+        Storage.set('break_scheduler_base_date', data.baseDate);
       }
     },
 
@@ -342,6 +399,7 @@
         const breakChoices = {};
         const breakOverrides = {};
         const breakStatuses = {};
+        const smartTimings = {};
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('break_att_')) {
@@ -356,7 +414,11 @@
           if (key && key.startsWith('break_status_')) {
             breakStatuses[key] = Storage.get(key, {});
           }
+          if (key && key.startsWith('break_smart_timing_')) {
+            smartTimings[key] = Storage.get(key, {});
+          }
         }
+        const baseDate = Storage.get('break_scheduler_base_date', '');
 
         const payload = {
           updatedAt: nowIso,
@@ -365,20 +427,23 @@
           breakChoices,
           breakOverrides,
           breakStatuses,
+          smartTimings,
+          baseDate,
           password
         };
 
-        this._lastHash = JSON.stringify(staff) + JSON.stringify(attendance) + JSON.stringify(breakChoices) + JSON.stringify(breakOverrides) + JSON.stringify(breakStatuses) + JSON.stringify(password || '');
+        this.computeCurrentHash();
 
         let res;
         if (isSupa) {
           const supaRows = [
             { key: 'staff', value: staff, updated_at: nowIso },
-            { key: 'settings', value: { password, updatedAt: nowIso }, updated_at: nowIso },
+            { key: 'settings', value: { password, updatedAt: nowIso, baseDate }, updated_at: nowIso },
             { key: 'attendance', value: attendance, updated_at: nowIso },
             { key: 'breakChoices', value: breakChoices, updated_at: nowIso },
             { key: 'breakOverrides', value: breakOverrides, updated_at: nowIso },
-            { key: 'breakStatuses', value: breakStatuses, updated_at: nowIso }
+            { key: 'breakStatuses', value: breakStatuses, updated_at: nowIso },
+            { key: 'smartTimings', value: smartTimings, updated_at: nowIso }
           ];
 
           res = await fetch(`${supa.url}/rest/v1/break_scheduler_data`, {
@@ -419,7 +484,7 @@
       if (this._pollTimer) clearInterval(this._pollTimer);
       this._pollTimer = setInterval(() => {
         this.pullData(false);
-      }, 5000);
+      }, 10000);
     },
 
     _setupModalListeners() {
@@ -477,13 +542,6 @@
           hideSupaModal();
         });
       }
-    },
-
-    startAutoPoll() {
-      if (this._pollTimer) clearInterval(this._pollTimer);
-      this._pollTimer = setInterval(() => {
-        this.pullData(false);
-      }, 10000);
     },
 
     updateBadge(status, text) {
@@ -872,9 +930,7 @@
 
     _save() {
       Storage.setStaff(this._staff);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     }
   };
 
@@ -894,10 +950,8 @@
       if (!data[staffId]) data[staffId] = {};
       data[staffId][d.getDate()] = status;
       Storage.setAttendance(d.getFullYear(), d.getMonth(), data);
+      Storage.touch();
       App.refreshAll();
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData(true);
-      }
     },
 
     toggleStatus(staffId, date) {
@@ -915,6 +969,7 @@
 
     setBaseDate(dateStr) {
       Storage.set('break_scheduler_base_date', dateStr);
+      Storage.touch();
     },
 
     getActiveStaffForDate(date) {
@@ -972,9 +1027,7 @@
       if (!choices[staffId]) choices[staffId] = {};
       choices[staffId][`round_${roundNumber}`] = durationSeconds;
       Storage.set(`break_choice_${dateStr}`, choices);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     },
 
     getStaffChoice(date, staffId, roundNumber, defaultDuration) {
@@ -997,18 +1050,14 @@
       });
       if (changed) {
         Storage.set(`break_choice_${dateStr}`, choices);
-        if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-          CloudSync.debouncePushData();
-        }
+        Storage.touch();
       }
     },
 
     resetAll(date) {
       const dateStr = toDateString(date);
       Storage.remove(`break_choice_${dateStr}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     }
   };
 
@@ -1034,9 +1083,7 @@
         delete overrides[staffId][`round_${roundNumber}`].keluar;
       }
       Storage.set(`break_override_${dateStr}`, overrides);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     },
 
     setMasuk(date, staffId, roundNumber, timeStr) {
@@ -1052,9 +1099,7 @@
         delete overrides[staffId][`round_${roundNumber}`].masuk;
       }
       Storage.set(`break_override_${dateStr}`, overrides);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     },
 
     getStaffOverride(date, staffId, roundNumber) {
@@ -1077,18 +1122,14 @@
       });
       if (changed) {
         Storage.set(`break_override_${dateStr}`, overrides);
-        if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-          CloudSync.debouncePushData();
-        }
+        Storage.touch();
       }
     },
 
     resetAll(date) {
       const dateStr = toDateString(date);
       Storage.remove(`break_override_${dateStr}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     }
   };
 
@@ -1119,9 +1160,7 @@
       }
 
       Storage.set(`break_status_${dateStr}`, map);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
-      }
+      Storage.touch();
       return !current;
     },
 
@@ -1137,18 +1176,14 @@
       });
       if (changed) {
         Storage.set(`break_status_${dateStr}`, map);
-        if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-          CloudSync.pushData();
-        }
+        Storage.touch();
       }
     },
 
     resetAll(date) {
       const dateStr = toDateString(date);
       Storage.remove(`break_status_${dateStr}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.pushData) {
-        CloudSync.pushData();
-      }
+      Storage.touch();
     }
   };
 
@@ -1164,16 +1199,12 @@
 
     setConfig(shift = 'pagi', config) {
       Storage.set(`break_smart_timing_${shift}`, config);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     },
 
     resetConfig(shift = 'pagi') {
       Storage.remove(`break_smart_timing_${shift}`);
-      if (typeof CloudSync !== 'undefined' && CloudSync.debouncePushData) {
-        CloudSync.debouncePushData();
-      }
+      Storage.touch();
     }
   };
 
