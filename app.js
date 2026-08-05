@@ -1917,15 +1917,39 @@
         usedDurationsByStaff[s.id] = new Set();
       });
 
+      let prevRoundEndPointer = null;
+
       for (let r = 0; r < MAX_BREAK_COUNT; r++) {
         const defaultDuration = defaultDurations[r];
 
-        // Determine round start time (from manual config or auto-calculated Auto-Fit gap)
+        // Determine round start time dynamically (cascading from Round 1 or previous round finish)
         let roundStart;
-        if (smartConfig && smartConfig.startTimeSec !== undefined) {
-          roundStart = smartConfig.startTimeSec + r * ((smartConfig.gaps && smartConfig.gaps[r] !== undefined ? smartConfig.gaps[r] * 60 : 0) + N * defaultDuration);
+        if (r === 0) {
+          const firstStaff = filteredStaff[0];
+          const firstOverride = firstStaff ? BreakOverrideManager.getStaffOverride(targetDate, firstStaff.id, 1) : {};
+          if (firstOverride && firstOverride.keluar !== undefined) {
+            let firstKeluar = firstOverride.keluar;
+            if (currentShift === 'malam' && firstKeluar < 43200) {
+              firstKeluar += 86400;
+            }
+            roundStart = firstKeluar;
+          } else if (smartConfig && smartConfig.startTimeSec !== undefined) {
+            roundStart = smartConfig.startTimeSec;
+          } else {
+            roundStart = autoCalcRes.roundDetails[0] ? autoCalcRes.roundDetails[0].roundStartSec : ((currentShift === 'malam') ? 68400 : 28800);
+          }
         } else {
-          roundStart = autoCalcRes.roundDetails[r] ? autoCalcRes.roundDetails[r].roundStartSec : ((currentShift === 'malam') ? 68400 : 28800);
+          const gapSecs = (smartConfig && Array.isArray(smartConfig.gaps) && smartConfig.gaps[r - 1] !== undefined)
+            ? (smartConfig.gaps[r - 1] * 60)
+            : (autoCalcRes && autoCalcRes.gapBufferSec ? autoCalcRes.gapBufferSec : 0);
+
+          if (prevRoundEndPointer !== null) {
+            roundStart = prevRoundEndPointer + gapSecs;
+          } else if (smartConfig && smartConfig.startTimeSec !== undefined) {
+            roundStart = smartConfig.startTimeSec + r * ((smartConfig.gaps && smartConfig.gaps[r] !== undefined ? smartConfig.gaps[r] * 60 : 0) + N * defaultDuration);
+          } else {
+            roundStart = autoCalcRes.roundDetails[r] ? autoCalcRes.roundDetails[r].roundStartSec : ((currentShift === 'malam') ? 68400 : 28800);
+          }
         }
 
         const breakRound = {
@@ -2044,11 +2068,7 @@
         breakRound.totalScheduledDuration = totalScheduledDuration;
         breakRound.totalActualDuration = blockActualEnd - blockStart;
 
-        // Next break round starts when the last staff member of this round finishes + optional gap!
-        const gapSecs = (smartConfig && Array.isArray(smartConfig.gaps) && smartConfig.gaps[r] !== undefined)
-          ? (smartConfig.gaps[r] * 60)
-          : 0;
-        roundStart = currentPointer + gapSecs;
+        prevRoundEndPointer = currentPointer;
         schedule.breaks.push(breakRound);
       }
 
